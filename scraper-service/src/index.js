@@ -22,6 +22,7 @@ const { pool }                  = require('./db/postgres');
 const { runScrapeJob }          = require('./jobs/scrapeJob');
 const { runTrendingJob }        = require('./jobs/trendingJob');
 const { runCleanupJob }         = require('./jobs/cleanupJob');
+const { runVideoScrapeJob }     = require('./jobs/videoScrapeJob');
 const { ALL_SOURCES, getSupportedLanguages } = require('./sources');
 const { get: redisGet }         = require('./db/redis');
 const logger                    = require('./utils/logger');
@@ -80,6 +81,17 @@ app.post('/api/v1/trending/recalculate', async (req, res) => {
   logger.info('[API] Manual trending recalculate triggered');
   try {
     const result = await runTrendingJob();
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Trigger video scraping now
+app.post('/api/v1/videos/scrape', async (req, res) => {
+  logger.info('[API] Manual video scrape triggered');
+  try {
+    const result = await runVideoScrapeJob();
     res.json({ success: true, data: result });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -183,6 +195,15 @@ const start = async () => {
     logger.info(`[Cron] Cleanup schedule: ${cleanupSchedule}`);
     cron.schedule(cleanupSchedule, () => {
       runCleanupJob().catch(err => logger.error('[Cron] Cleanup error:', err));
+    }, { timezone: 'Asia/Kolkata' });
+
+    // 4. Video scrape: every 2 hours
+    const videoSchedule = process.env.CRON_VIDEO_SCRAPE || '0 */2 * * *';
+    logger.info(`[Cron] Video scrape schedule: ${videoSchedule}`);
+    // Run once on startup too
+    runVideoScrapeJob().catch(err => logger.error('[Startup] Initial video scrape error:', err));
+    cron.schedule(videoSchedule, () => {
+      runVideoScrapeJob().catch(err => logger.error('[Cron] Video scrape error:', err));
     }, { timezone: 'Asia/Kolkata' });
 
     // ── Graceful Shutdown ─────────────────────────────────────────
