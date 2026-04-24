@@ -20,11 +20,10 @@ FROM base AS runner
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup -S nextjs && adduser -S nextjs -G nextjs
-RUN mkdir -p ./public
-COPY --from=builder --chown=nextjs:nextjs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nextjs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nextjs /app .
 USER nextjs
-EXPOSE 4000
-ENV PORT=4000
-CMD ["node", "server.js"]
+EXPOSE 8080
+ENV PORT=8080
+ENV HOSTNAME=0.0.0.0
+CMD ["sh", "-c", "./node_modules/.bin/next start -p ${PORT:-8080} -H 0.0.0.0"]
 
