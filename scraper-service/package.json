@@ -1,0 +1,31 @@
+{
+  "name": "scraper-service",
+  "version": "1.0.0",
+  "description": "News scraper microservice for SamacharDaily — 100+ Indian sources across 10 languages",
+  "main": "src/index.js",
+  "scripts": {
+    "start":    "node src/index.js",
+    "dev":      "nodemon src/index.js",
+    "test":     "node src/jobs/scrapeJob.js",
+    "sources":  "node -e \"const s=require('./src/sources');console.log('Total:',s.ALL_SOURCES.length,'Languages:',s.getSupportedLanguages())\""
+  },
+  "dependencies": {
+    "axios":          "^1.6.8",
+    "cheerio":        "^1.0.0",
+    "dotenv":         "^16.4.5",
+    "express":        "^4.18.3",
+    "kafkajs":        "^2.2.4",
+    "node-cron":      "^3.0.3",
+    "pg":             "^8.11.3",
+    "redis":          "^4.6.13",
+    "rss-parser":     "^3.13.0",
+    "uuid":           "^9.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+

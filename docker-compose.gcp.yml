@@ -1,0 +1,22 @@
+# ============================================================
+#  GCP Deployment Overrides
+#  Usage:
+#    docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.gcp.yml up -d --build
+#
+#  Before running:
+#    1. Set GCP_EXTERNAL_IP in your .env file (your VM's external IP)
+#    2. Fill in all secrets in .env
+# ============================================================
+
+services:
+  web-app:
+    build:
+      args:
+        NEXT_PUBLIC_API_URL: http://${GCP_EXTERNAL_IP}:3000
+        NEXT_PUBLIC_APP_URL: http://${GCP_EXTERNAL_IP}:4000
+
+  admin-dashboard:
+    build:
+      args:
+        VITE_API_URL: http://${GCP_EXTERNAL_IP}:3000
+        VITE_SCRAPER_URL: http://${GCP_EXTERNAL_IP}:3007

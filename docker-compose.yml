@@ -1,0 +1,627 @@
+version: "3.9"
+
+# ============================================================
+#  SamacharDaily — Local Development Infrastructure
+#  Run: docker compose up -d
+# ============================================================
+
+services:
+
+  # ── PostgreSQL 16 ─────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: sd_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-samachar_daily}
+      POSTGRES_USER: ${POSTGRES_USER:-sd_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sd_secret}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sd_user} -d ${POSTGRES_DB:-samachar_daily}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sd_network
+
+  # ── Redis 7 ───────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: sd_redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-redis_secret}
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_secret}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sd_network
+
+  # ── Apache Kafka 3.7 (Confluent Platform) ─────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: sd_kafka
+    restart: unless-stopped
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_RETENTION_BYTES: 1073741824
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "9092:9092"   # internal (service-to-service)
+      - "9094:9094"   # external (host machine / tools)
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 9092 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - sd_network
+
+  # ── Zookeeper (required for Confluent Kafka) ───────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: sd_zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zk_data:/var/lib/zookeeper/data
+    healthcheck:
+      test: ["CMD", "echo", "ruok", "|", "nc", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sd_network
+
+  # ── Kafka UI (Provectus) ───────────────────────────────────
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: sd_kafka_ui
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_started
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    ports:
+      - "8080:8080"
+    networks:
+      - sd_network
+
+  # ── Elasticsearch 8 ───────────────────────────────────────
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
+    container_name: sd_elasticsearch
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.security.enrollment.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+      ELASTIC_USERNAME: ${ES_USERNAME:-elastic}
+      ELASTIC_PASSWORD: ${ES_PASSWORD:-elastic_secret}
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    networks:
+      - sd_network
+
+  # ── Kibana 8 (ES dashboard) ────────────────────────────────
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.0
+    container_name: sd_kibana
+    restart: unless-stopped
+    depends_on:
+      - elasticsearch
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      xpack.security.enabled: "false"
+    ports:
+      - "5601:5601"
+    networks:
+      - sd_network
+
+  # ── Adminer (Postgres web UI) ──────────────────────────────
+  adminer:
+    image: adminer:latest
+    container_name: sd_adminer
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    ports:
+      - "8081:8080"
+    networks:
+      - sd_network
+
+  # ── Redis Commander (Redis web UI) ────────────────────────
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: sd_redis_ui
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: "local:redis:6379:0:${REDIS_PASSWORD:-redis_secret}"
+    ports:
+      - "8082:8081"
+    depends_on:
+      - redis
+    networks:
+      - sd_network
+  # ── API Gateway (Single Entry Point) ──────────────────────
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: sd_gateway
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3000
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-key-in-production}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      AUTH_SERVICE_URL: http://auth-service:3001
+      CONTENT_SERVICE_URL: http://content-service:3002
+      FEED_SERVICE_URL: http://feed-service:3003
+      SEARCH_SERVICE_URL: http://search-service:3004
+      NOTIFICATIONS_SERVICE_URL: http://notification-service:3005
+      RECOMMENDATIONS_SERVICE_URL: http://recommendation-service:3006
+    ports:
+      - "3000:3000"
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      content-service:
+        condition: service_healthy
+      feed-service:
+        condition: service_healthy
+      search-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      recommendation-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - sd_network
+    volumes:
+      - ./api-gateway/src:/app/src  # For live reload in development
+  # ── Auth Service (JWT + Google OAuth) ──────────────────────
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: sd_auth
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3001
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-key-in-production}
+      JWT_ACCESS_TOKEN_EXPIRY: 15m
+      JWT_REFRESH_TOKEN_EXPIRY: 7d
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-samachar_daily}
+      POSTGRES_USER: ${POSTGRES_USER:-sd_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sd_secret}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      REDIS_DB: 1
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - sd_network
+    volumes:
+      - ./auth-service/src:/app/src  # For live reload in development
+
+  # ── Content Service (Article Ingestion) ──────────────────
+  content-service:
+    build:
+      context: ./content-service
+      dockerfile: Dockerfile
+    container_name: sd_content
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3002
+      NEWSAPI_KEY: ${NEWSAPI_KEY:-}
+      NEWSAPI_BASE_URL: ${NEWSAPI_BASE_URL:-https://newsapi.org/v2}
+      RSS_FEEDS: ${RSS_FEEDS:-}
+      INGESTION_INTERVAL_MINUTES: ${INGESTION_INTERVAL_MINUTES:-30}
+      MAX_ARTICLES_PER_FETCH: ${MAX_ARTICLES_PER_FETCH:-100}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-samachar_daily}
+      POSTGRES_USER: ${POSTGRES_USER:-sd_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sd_secret}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      REDIS_DB: 2
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-key-in-production}
+    ports:
+      - "3002:3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - sd_network
+    volumes:
+      - ./content-service/src:/app/src  # For live reload in development
+
+  # ── Feed Service (Personalization & Ranking) ─────────────
+  feed-service:
+    build:
+      context: ./feed-service
+      dockerfile: Dockerfile
+    container_name: sd_feed
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3003
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-samachar_daily}
+      POSTGRES_USER: ${POSTGRES_USER:-sd_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sd_secret}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      REDIS_DB: 3
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-key-in-production}
+      RECENCY_WEIGHT: ${RECENCY_WEIGHT:-0.20}
+      TRENDING_WEIGHT: ${TRENDING_WEIGHT:-0.30}
+      AFFINITY_WEIGHT: ${AFFINITY_WEIGHT:-0.40}
+      ENGAGEMENT_WEIGHT: ${ENGAGEMENT_WEIGHT:-0.10}
+      FEED_CACHE_TTL_MINUTES: ${FEED_CACHE_TTL_MINUTES:-5}
+      MIN_AFFINITY_THRESHOLD: ${MIN_AFFINITY_THRESHOLD:-0.1}
+    ports:
+      - "3003:3003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - sd_network
+    volumes:
+      - ./feed-service/src:/app/src  # For live reload in development
+
+  # ── Search Service (Full-text Search) ────────────────────
+  search-service:
+    build:
+      context: ./search-service
+      dockerfile: Dockerfile
+    container_name: sd_search
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3004
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-samachar_daily}
+      POSTGRES_USER: ${POSTGRES_USER:-sd_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sd_secret}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      REDIS_DB: 4
+      ES_HOST: http://elasticsearch:9200
+      ES_USERNAME: ${ES_USERNAME:-elastic}
+      ES_PASSWORD: ${ES_PASSWORD:-elastic_secret}
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: search-service
+      KAFKA_GROUP_ID: search-service-group
+      KAFKA_TOPIC_ARTICLES: ${KAFKA_TOPIC_ARTICLE_INGESTION:-article_ingestion}
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-key-in-production}
+      SEARCH_CACHE_TTL_MINUTES: ${SEARCH_CACHE_TTL_MINUTES:-5}
+      ES_INDEX_ARTICLES: ${ES_INDEX_ARTICLES:-sd_articles}
+    ports:
+      - "3004:3004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - sd_network
+    volumes:
+      - ./search-service/src:/app/src  # For live reload in development
+
+  # ── Notification Service (Push Notifications) ────────────
+  notification-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    container_name: sd_notification
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3005
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-samachar_daily}
+      POSTGRES_USER: ${POSTGRES_USER:-sd_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sd_secret}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      REDIS_DB: 5
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_PRIVATE_KEY_ID: ${FIREBASE_PRIVATE_KEY_ID:-}
+      FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY:-}
+      FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL:-}
+      FIREBASE_CLIENT_ID: ${FIREBASE_CLIENT_ID:-}
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: notification-service
+      KAFKA_GROUP_ID: notification-service-group
+      KAFKA_TOPIC_BREAKING_NEWS: ${KAFKA_TOPIC_BREAKING_NEWS:-breaking_news}
+      KAFKA_TOPIC_NOTIFICATIONS: ${KAFKA_TOPIC_NOTIFICATIONS:-notification_events}
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-key-in-production}
+    ports:
+      - "3005:3005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - sd_network
+    volumes:
+      - ./notification-service/src:/app/src  # For live reload in development
+
+  # ── Recommendation Service (ML-based Recommendations) ─────
+  recommendation-service:
+    build:
+      context: ./recommendation-service
+      dockerfile: Dockerfile
+    container_name: sd_recommendation
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3006
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-samachar_daily}
+      POSTGRES_USER: ${POSTGRES_USER:-sd_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sd_secret}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      REDIS_DB: 6
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: recommendation-service
+      KAFKA_GROUP_ID: recommendation-service-group
+      KAFKA_TOPIC_CLICKSTREAM: ${KAFKA_TOPIC_CLICKSTREAM:-clickstream}
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-key-in-production}
+    ports:
+      - "3006:3006"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3006/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - sd_network
+    volumes:
+      - ./recommendation-service/src:/app/src  # For live reload in development
+
+  # ── News Reader Web App (Next.js) ────────────────────────
+  web-app:
+    build:
+      context: ./web-app
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://api-gateway:3000
+        NEXT_PUBLIC_APP_URL: http://localhost:4000
+    container_name: sd_web
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      NODE_ENV: production
+    depends_on:
+      - api-gateway
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - sd_network
+
+  # ── Admin Dashboard (React + Vite → Nginx) ───────────────
+  admin-dashboard:
+    build:
+      context: ./admin-dashboard
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3000
+        VITE_SCRAPER_URL: http://localhost:3007
+    container_name: sd_admin
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    depends_on:
+      - api-gateway
+      - scraper-service
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - sd_network
+
+  # ── Scraper Service (RSS + Web Scraper) ──────────────────
+  scraper-service:
+    build:
+      context: ./scraper-service
+      dockerfile: Dockerfile
+    container_name: sd_scraper
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3006
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-samachar_daily}
+      POSTGRES_USER: ${POSTGRES_USER:-sd_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sd_secret}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379/0
+      KAFKA_ENABLED: "true"
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_TOPIC_NEW_ARTICLES: ${KAFKA_TOPIC_NEW_ARTICLES:-new-articles}
+      CRON_SCRAPE: ${CRON_SCRAPE:-*/30 * * * *}
+      CRON_TRENDING: ${CRON_TRENDING:-*/15 * * * *}
+      CRON_CLEANUP: ${CRON_CLEANUP:-0 2 * * *}
+      RSS_CONCURRENCY: ${RSS_CONCURRENCY:-8}
+      MAX_INGEST_PER_RUN: ${MAX_INGEST_PER_RUN:-500}
+      ENABLE_CONTENT_ENRICHMENT: ${ENABLE_CONTENT_ENRICHMENT:-true}
+      MAX_ENRICH_PER_RUN: ${MAX_ENRICH_PER_RUN:-100}
+      ENRICH_CONCURRENCY: ${ENRICH_CONCURRENCY:-3}
+      TRENDING_DECAY_LAMBDA: ${TRENDING_DECAY_LAMBDA:-0.1}
+      TRENDING_WINDOW_HOURS: ${TRENDING_WINDOW_HOURS:-48}
+      TRENDING_TOP_N: ${TRENDING_TOP_N:-20}
+      CLEANUP_ARCHIVE_DAYS: ${CLEANUP_ARCHIVE_DAYS:-7}
+      CLEANUP_DELETE_DAYS: ${CLEANUP_DELETE_DAYS:-30}
+    ports:
+      - "3007:3006"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3006/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - sd_network
+    volumes:
+      - ./scraper-service/src:/app/src  # For live reload in development
+
+# ── Volumes ────────────────────────────────────────────────
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  zk_data:
+    driver: local
+  kafka_data:
+    driver: local
+  es_data:
+    driver: local
+
+# ── Networks ───────────────────────────────────────────────
+networks:
+  sd_network:
+    driver: bridge
+    name: sd_network
+
