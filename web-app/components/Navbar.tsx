@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { Search, Moon, Sun, Menu, X, Newspaper } from 'lucide-react';
+import { Search, Moon, Sun, Menu, X, Newspaper, Play } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useState, Suspense } from 'react';
 import { LANGUAGES } from '@/lib/constants';
@@ -44,6 +44,16 @@ function NavContent() {
 
           {/* Actions */}
           <div className="flex items-center gap-2">
+            <Link
+              href="/videos"
+              className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
+                ${pathname === '/videos'
+                  ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+            >
+              <Play size={14} fill="currentColor" />
+              Videos
+            </Link>
             <Link href="/search"
               className="p-2 rounded-lg text-slate-500 hover:text-brand-600 hover:bg-slate-100
                          dark:hover:bg-slate-800 transition-colors">
@@ -66,6 +76,16 @@ function NavContent() {
         {/* Mobile Menu */}
         {menuOpen && (
           <div className="md:hidden pb-3 flex flex-wrap gap-2 border-t border-slate-100 dark:border-slate-800 pt-3">
+            <Link
+              href="/videos"
+              onClick={() => setMenuOpen(false)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
+                ${pathname === '/videos'
+                  ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+            >
+              <Play size={13} fill="currentColor" /> Videos
+            </Link>
             {LANGUAGES.map(lang => (
               <Link
                 key={lang.code}

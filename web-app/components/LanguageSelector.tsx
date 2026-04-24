@@ -1,13 +1,13 @@
 import Link from 'next/link';
 import { LANGUAGES } from '@/lib/constants';
 
-export function LanguageSelector({ activeLang }: { activeLang: string }) {
+export function LanguageSelector({ activeLang, basePath = '/' }: { activeLang: string; basePath?: string }) {
   return (
     <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
       {LANGUAGES.map(lang => (
         <Link
           key={lang.code}
-          href={`/?lang=${lang.code}`}
+          href={`${basePath}?lang=${lang.code}`}
           className={`flex flex-col items-center px-3 py-2 rounded-xl text-xs font-medium
                       whitespace-nowrap transition-all min-w-[56px]
             ${activeLang === lang.code

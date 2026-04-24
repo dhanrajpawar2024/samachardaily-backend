@@ -79,6 +79,36 @@ export const searchArticles = (q: string, language?: string, page = 1) => {
   return fetchJson<SearchResponse>(`${API_BASE}/api/v1/search?${params}`, { cache: 'no-store' });
 };
 
+// ── Videos ────────────────────────────────────────────────────────
+
+export interface Video {
+  id: string;
+  title: string;
+  description?: string;
+  video_url: string;
+  thumbnail_url?: string;
+  author_name?: string;
+  language: string;
+  category_name?: string;
+  view_count: number;
+  like_count: number;
+  published_at: string;
+}
+
+export interface VideoListResponse {
+  videos: Video[];
+  pagination: { page: number; limit: number; total: number; total_pages: number };
+}
+
+export const getVideos = (params: { language?: string; page?: number; limit?: number } = {}) => {
+  const q = new URLSearchParams({
+    ...(params.language && { language: params.language }),
+    page:  String(params.page  ?? 1),
+    limit: String(params.limit ?? 24),
+  });
+  return fetchJson<VideoListResponse>(`${API_BASE}/api/v1/videos?${q}`, { next: { revalidate: 300 } });
+};
+
 // ── Client-side helpers ──────────────────────────────────────────
 
 export const recordView = async (articleId: string) => {
