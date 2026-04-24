@@ -22,8 +22,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup -S nextjs && adduser -S nextjs -G nextjs
 COPY --from=builder --chown=nextjs:nextjs /app .
 USER nextjs
-EXPOSE 8080
-ENV PORT=8080
+EXPOSE 4000
+ENV PORT=4000
 ENV HOSTNAME=0.0.0.0
-CMD ["sh", "-c", "./node_modules/.bin/next start -p ${PORT:-8080} -H 0.0.0.0"]
+CMD ["sh", "-c", "./node_modules/.bin/next start -p ${PORT:-4000} -H 0.0.0.0"]
 
