@@ -103,16 +103,20 @@ const start = async () => {
     await redisDb.connect();
     console.log('[Search Service] Redis connected (DB 4)');
 
-    // Connect to Elasticsearch
-    await elasticsearchDb.connect();
-    console.log('[Search Service] Elasticsearch connected');
+    // Connect to Elasticsearch (non-blocking)
+    elasticsearchDb.connect()
+      .then(() => {
+        console.log('[Search Service] Elasticsearch connected');
+        return elasticsearchDb.createIndex();
+      })
+      .catch(err => {
+        console.warn('[Search Service] Elasticsearch unavailable:', err.message);
+      });
 
-    // Create index if it doesn't exist
-    await elasticsearchDb.createIndex();
-
-    // Start Kafka consumer
-    await kafkaConsumer.startConsumer();
-    console.log('[Search Service] Kafka consumer started');
+    // Start Kafka consumer (non-blocking)
+    kafkaConsumer.startConsumer()
+      .then(() => console.log('[Search Service] Kafka consumer started'))
+      .catch(err => console.warn('[Search Service] Kafka unavailable:', err.message));
 
     // Start Express server
     const server = app.listen(PORT, () => {

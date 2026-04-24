@@ -116,9 +116,10 @@ const start = async () => {
     await redisDb.connect();
     console.log('[Recommendation Service] Redis connected (DB 6)');
 
-    // Start Kafka consumer
-    await kafkaConsumer.startConsumer();
-    console.log('[Recommendation Service] Kafka consumer started');
+    // Start Kafka consumer (non-blocking)
+    kafkaConsumer.startConsumer()
+      .then(() => console.log('[Recommendation Service] Kafka consumer started'))
+      .catch(err => console.warn('[Recommendation Service] Kafka unavailable:', err.message));
 
     // Start Express server
     const server = app.listen(PORT, () => {

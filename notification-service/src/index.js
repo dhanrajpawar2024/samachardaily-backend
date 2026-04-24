@@ -108,9 +108,10 @@ const start = async () => {
     firebaseDb.initialize();
     console.log('[Notification Service] Firebase initialized');
 
-    // Start Kafka consumer
-    await kafkaConsumer.startConsumer();
-    console.log('[Notification Service] Kafka consumer started');
+    // Start Kafka consumer (non-blocking)
+    kafkaConsumer.startConsumer()
+      .then(() => console.log('[Notification Service] Kafka consumer started'))
+      .catch(err => console.warn('[Notification Service] Kafka unavailable:', err.message));
 
     // Setup scheduled tasks for processing pending notifications
     cron.schedule('*/5 * * * *', async () => {
