@@ -40,10 +40,10 @@ const runTrendingJob = async () => {
          ),
          updated_at = NOW()
        WHERE
-         published_at > NOW() - INTERVAL '${WINDOW_HOURS} hours'
+         published_at > NOW() - INTERVAL '1 second' * $2
          AND is_published = true
        RETURNING id`,
-      [DECAY_LAMBDA]
+      [DECAY_LAMBDA, WINDOW_HOURS * 3600]
     );
 
     const updatedCount = updateResult.rowCount;
@@ -62,10 +62,10 @@ const runTrendingJob = async () => {
          FROM articles
          WHERE language = $1
            AND is_published = true
-           AND published_at > NOW() - INTERVAL '${WINDOW_HOURS} hours'
+           AND published_at > NOW() - INTERVAL '1 second' * $2
          ORDER BY trending_score DESC
-         LIMIT $2`,
-        [lang, TOP_N]
+         LIMIT $3`,
+        [lang, WINDOW_HOURS * 3600, TOP_N]
       );
       if (topArticles.rows.length > 0) {
         await redisSet(`trending:${lang}`, topArticles.rows, 60 * 15); // 15-min cache
