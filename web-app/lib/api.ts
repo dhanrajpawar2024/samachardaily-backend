@@ -32,7 +32,9 @@ export interface SearchResponse {
 }
 
 const fetchJson = async <T>(url: string, options?: RequestInit): Promise<T> => {
+  const timeoutSignal = AbortSignal.timeout(10000);
   const res = await fetch(url, {
+    signal: timeoutSignal,
     next: { revalidate: 60 },
     ...options,
   });

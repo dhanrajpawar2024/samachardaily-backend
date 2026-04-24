@@ -26,5 +26,17 @@ export const CATEGORIES = [
 
 export type CategorySlug = typeof CATEGORIES[number]['slug'];
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const PUBLIC_API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (process.env.RAILWAY_SERVICE_API_GATEWAY_URL
+    ? `https://${process.env.RAILWAY_SERVICE_API_GATEWAY_URL}`
+    : 'https://api-gateway-production-7cbb.up.railway.app');
+
+const INTERNAL_API_BASE =
+  process.env.INTERNAL_API_URL ||
+  'http://api-gateway.railway.internal:8080';
+
+export const API_BASE = typeof window === 'undefined'
+  ? INTERNAL_API_BASE
+  : PUBLIC_API_BASE;
 
