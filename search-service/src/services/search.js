@@ -2,6 +2,107 @@ const { get: redisGet, set: redisSet } = require('../db/redis');
 const elasticsearch = require('../db/elasticsearch');
 const { getAll } = require('../db/postgres');
 
+const normalizeSort = (sortBy = 'published_at', sortOrder = 'desc') => {
+  const allowedSort = new Set(['published_at', 'trending_score']);
+  const safeSortBy = allowedSort.has(sortBy) ? sortBy : 'published_at';
+  const safeSortOrder = String(sortOrder).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+  return { safeSortBy, safeSortOrder };
+};
+
+const searchArticlesViaPostgres = async (query, language, page, limit, filters) => {
+  const pageNum = parseInt(page) || 1;
+  const pageLimit = Math.min(parseInt(limit) || 20, 100);
+  const offset = (pageNum - 1) * pageLimit;
+  const { safeSortBy, safeSortOrder } = normalizeSort(filters.sort_by, filters.sort_order);
+
+  const where = [
+    'a.is_published = TRUE',
+    'a.language = $1',
+    '(a.title ILIKE $2 OR COALESCE(a.summary, \'\') ILIKE $2 OR COALESCE(a.content, \'\') ILIKE $2)',
+  ];
+  const params = [language, `%${query}%`];
+
+  if (filters.category_id) {
+    params.push(filters.category_id);
+    where.push(`a.category_id = $${params.length}`);
+  }
+  if (filters.author) {
+    params.push(filters.author);
+    where.push(`a.author = $${params.length}`);
+  }
+  if (filters.source) {
+    params.push(filters.source);
+    where.push(`a.source_name = $${params.length}`);
+  }
+  if (filters.date_from) {
+    params.push(filters.date_from);
+    where.push(`a.published_at >= $${params.length}`);
+  }
+  if (filters.date_to) {
+    params.push(filters.date_to);
+    where.push(`a.published_at <= $${params.length}`);
+  }
+
+  const whereSql = where.join(' AND ');
+
+  const countRows = await getAll(
+    `SELECT COUNT(*)::int AS total
+     FROM articles a
+     WHERE ${whereSql}`,
+    params
+  );
+  const total = countRows[0]?.total || 0;
+
+  const listParams = [...params, pageLimit, offset];
+  const articles = await getAll(
+    `SELECT
+       a.id,
+       a.title,
+       a.summary,
+       a.content,
+       a.author,
+       a.source_url,
+       a.source_name,
+       a.category_id,
+       COALESCE(c.name, '') AS category_name,
+       a.language,
+       a.thumbnail_url,
+       a.published_at,
+       a.view_count,
+       a.like_count,
+       a.share_count,
+       a.trending_score,
+       a.is_premium
+     FROM articles a
+     LEFT JOIN categories c ON c.id = a.category_id
+     WHERE ${whereSql}
+     ORDER BY a.${safeSortBy} ${safeSortOrder}
+     LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    listParams
+  );
+
+  return {
+    query,
+    total,
+    articles,
+    pagination: {
+      page: pageNum,
+      limit: pageLimit,
+      total_pages: Math.max(1, Math.ceil(total / pageLimit)),
+    },
+    filters: {
+      language,
+      sort_by: safeSortBy,
+      sort_order: safeSortOrder.toLowerCase(),
+      ...(filters.category_id && { category_id: filters.category_id }),
+      ...(filters.author && { author: filters.author }),
+      ...(filters.source && { source: filters.source }),
+      ...(filters.date_from && { date_from: filters.date_from }),
+      ...(filters.date_to && { date_to: filters.date_to }),
+    },
+  };
+};
+
 /**
  * Search articles with full-text search and filtering
  */
@@ -45,20 +146,25 @@ const searchArticles = async (
       esFilters.date_to = filters.date_to;
     }
 
-    // Search Elasticsearch
-    const results = await elasticsearch.search(query, esFilters);
-
-    const response = {
-      query,
-      total: results.total,
-      articles: results.articles,
-      pagination: {
-        page: esFilters.page,
-        limit: esFilters.limit,
-        total_pages: Math.ceil(results.total / esFilters.limit),
-      },
-      filters: esFilters,
-    };
+    let response;
+    try {
+      // Search Elasticsearch
+      const results = await elasticsearch.search(query, esFilters);
+      response = {
+        query,
+        total: results.total,
+        articles: results.articles,
+        pagination: {
+          page: esFilters.page,
+          limit: esFilters.limit,
+          total_pages: Math.max(1, Math.ceil(results.total / esFilters.limit)),
+        },
+        filters: esFilters,
+      };
+    } catch (esError) {
+      console.warn('[Search] Elasticsearch unavailable, using PostgreSQL fallback:', esError.message);
+      response = await searchArticlesViaPostgres(query, language, page, limit, filters);
+    }
 
     // Cache for 5 minutes
     const cacheTTL = (parseInt(process.env.SEARCH_CACHE_TTL_MINUTES) || 5) * 60;
@@ -81,18 +187,33 @@ const getSearchSuggestions = async (query, language = 'en', limit = 10) => {
   if (cached) return cached;
 
   try {
-    // Search with autocomplete analyzer
-    const results = await elasticsearch.search(query, {
-      language,
-      limit: limit * 2, // Get more to filter duplicates
-      sort_by: 'published_at',
-      sort_order: 'desc',
-    });
+    let suggestions;
+    try {
+      // Search with autocomplete analyzer
+      const results = await elasticsearch.search(query, {
+        language,
+        limit: limit * 2,
+        sort_by: 'published_at',
+        sort_order: 'desc',
+      });
 
-    // Extract unique titles for suggestions
-    const suggestions = Array.from(
-      new Set(results.articles.map((a) => a.title))
-    ).slice(0, limit);
+      suggestions = Array.from(
+        new Set(results.articles.map((a) => a.title))
+      ).slice(0, limit);
+    } catch (esError) {
+      console.warn('[Search] Suggestions fallback to PostgreSQL:', esError.message);
+      const rows = await getAll(
+        `SELECT DISTINCT a.title
+         FROM articles a
+         WHERE a.is_published = TRUE
+           AND a.language = $1
+           AND a.title ILIKE $2
+         ORDER BY a.title ASC
+         LIMIT $3`,
+        [language, `%${query}%`, limit]
+      );
+      suggestions = rows.map((r) => r.title);
+    }
 
     const response = {
       query,
@@ -122,10 +243,11 @@ const getTrendingKeywords = async (language = 'en', limit = 20) => {
   try {
     // Query database for trending articles
     const trendingArticles = await getAll(
-      `SELECT DISTINCT title, trending_score, category_name
-       FROM articles
-       WHERE is_published = TRUE AND language = $1
-       ORDER BY trending_score DESC, published_at DESC
+      `SELECT DISTINCT a.title, a.trending_score, c.name AS category_name
+       FROM articles a
+       LEFT JOIN categories c ON c.id = a.category_id
+       WHERE a.is_published = TRUE AND a.language = $1
+       ORDER BY a.trending_score DESC, a.published_at DESC
        LIMIT $2`,
       [language, limit]
     );
@@ -181,10 +303,10 @@ const getFilterOptions = async (language = 'en') => {
     );
 
     const sources = await getAll(
-      `SELECT DISTINCT source, COUNT(*) as count
+      `SELECT DISTINCT source_name, COUNT(*) as count
        FROM articles
        WHERE is_published = TRUE AND language = $1
-       GROUP BY source
+       GROUP BY source_name
        ORDER BY count DESC`,
       [language]
     );
@@ -201,7 +323,7 @@ const getFilterOptions = async (language = 'en') => {
         count: a.count,
       })),
       sources: sources.map((s) => ({
-        name: s.source,
+        name: s.source_name,
         count: s.count,
       })),
     };
