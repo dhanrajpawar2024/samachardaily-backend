@@ -18,7 +18,7 @@ router.get(
   queryValidator('q').trim().notEmpty().withMessage('Search query required'),
   queryValidator('page').optional().isInt({ min: 1 }).toInt(),
   queryValidator('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
-  queryValidator('language').optional().isISO31661Alpha2(),
+  queryValidator('language').optional().isISO6391(),
   queryValidator('category_id').optional().isUUID(),
   queryValidator('sort_by').optional().isIn(['published_at', 'trending_score', '_score']),
   queryValidator('sort_order').optional().isIn(['asc', 'desc']),
@@ -82,7 +82,7 @@ router.get(
 router.get(
   '/suggestions',
   queryValidator('q').trim().notEmpty().withMessage('Query required'),
-  queryValidator('language').optional().isISO31661Alpha2(),
+  queryValidator('language').optional().isISO6391(),
   queryValidator('limit').optional().isInt({ min: 1, max: 50 }).toInt(),
   async (req, res) => {
     const errors = validationResult(req);
