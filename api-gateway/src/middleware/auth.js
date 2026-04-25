@@ -21,6 +21,12 @@ const jwtMiddleware = (req, res, next) => {
   const path = req.path;
   const originalPath = (req.originalUrl || '').split('?')[0];
   const matchesPath = (prefix) => path.startsWith(prefix) || originalPath.startsWith(prefix);
+  const isAdsActiveRead = method === 'GET' && (
+    path === '/active' ||
+    path.startsWith('/active') ||
+    path.includes('/ads/active') ||
+    originalPath.includes('/ads/active')
+  );
 
   // Always public.
   if (path === '/health' || originalPath === '/health') return next();
@@ -33,6 +39,7 @@ const jwtMiddleware = (req, res, next) => {
     matchesPath('/api/v1/ads/active') ||
     path.startsWith('/ads/active') ||
     originalPath.startsWith('/ads/active') ||
+    isAdsActiveRead ||
     matchesPath('/api/v1/feed') ||
     matchesPath('/api/v1/search') ||
     matchesPath('/api/v1/recommendations')
