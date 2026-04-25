@@ -17,6 +17,7 @@ const feedRoutes = require('./routes/feed');
 const searchRoutes = require('./routes/search');
 const notificationsRoutes = require('./routes/notifications');
 const recommendationsRoutes = require('./routes/recommendations');
+const adsRoutes = require('./routes/ads');
 
 // Service imports
 const { healthCheck } = require('./services/proxy');
@@ -121,6 +122,11 @@ app.use('/api/v1/notifications', notificationsRoutes);
  * Recommendations routes
  */
 app.use('/api/v1/recommendations', recommendationsRoutes);
+
+/**
+ * Ads routes
+ */
+app.use('/api/v1/ads', adsRoutes);
 
 /**
  * Categories routes (proxied to content service)

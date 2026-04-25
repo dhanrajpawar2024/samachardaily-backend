@@ -52,6 +52,31 @@ export const triggerCleanup    = () => post(`${SCRAPER_BASE}/api/v1/cleanup`);
 export const addSource         = (body: { name: string; language: string; category: string; type: string; url: string }) =>
   post<{ success: boolean; data: Source }>(`${SCRAPER_BASE}/api/v1/sources`, body);
 
+// ── Ads ─────────────────────────────────────────────────────
+export const getAds = () => get<AdsResponse>(`${API_BASE}/api/v1/ads`);
+export const createAd = (body: AdPayload) => post<{ ad: AdPlacement }>(`${API_BASE}/api/v1/ads`, body);
+export const updateAd = async (id: string, body: AdPayload) => {
+  const res = await fetch(`${API_BASE}/api/v1/ads/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${res.status} ${API_BASE}/api/v1/ads/${id}`);
+  const data = await res.json();
+  return (data.data ?? data) as { ad: AdPlacement };
+};
+export const toggleAd = async (id: string, isActive: boolean) => {
+  const res = await fetch(`${API_BASE}/api/v1/ads/${id}/toggle`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ is_active: isActive }),
+  });
+  if (!res.ok) throw new Error(`${res.status} ${API_BASE}/api/v1/ads/${id}/toggle`);
+  const data = await res.json();
+  return (data.data ?? data) as { ad: AdPlacement };
+};
+export const deleteAd = (id: string) => del(`${API_BASE}/api/v1/ads/${id}`);
+
 // ── Types ─────────────────────────────────────────────────────────
 interface RawAdminArticle {
   id: string;
@@ -101,4 +126,39 @@ export interface ScraperHealth {
 export interface ScraperStats { last_run: ScraperHealth['last_run']; total_sources: number }
 export interface Source { name: string; language: string; category: string; type: string; url: string }
 export interface SourcesResponse { total: number; languages: string[]; sources: Source[] }
+
+export interface AdPlacement {
+  id: string;
+  position_key: string;
+  name: string;
+  provider: string;
+  placement_type: 'script' | 'image' | 'ad_unit';
+  article_id_after?: number | null;
+  ad_unit_id?: string | null;
+  html_snippet?: string | null;
+  image_url?: string | null;
+  target_url?: string | null;
+  language?: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface AdsResponse { ads: AdPlacement[] }
+
+export interface AdPayload {
+  position_key: string;
+  name?: string;
+  provider: string;
+  placement_type: 'script' | 'image' | 'ad_unit';
+  article_id_after?: number | null;
+  ad_unit_id?: string | null;
+  html_snippet?: string | null;
+  image_url?: string | null;
+  target_url?: string | null;
+  language?: string | null;
+  is_active: boolean;
+  sort_order: number;
+}
 

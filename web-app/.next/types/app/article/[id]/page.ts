@@ -1,4 +1,4 @@
-// File: E:\Android\SamacharDaily\backend\web-app\app\article\[id]\page.tsx
+// File: E:\samdaily-backend\backend\web-app\app\article\[id]\page.tsx
 import * as entry from '../../../../../app/article/[id]/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

@@ -8,6 +8,7 @@ const { pool } = require('./db/postgres');
 const { ingestArticles } = require('./services/ingestion');
 const articlesRoutes = require('./routes/articles');
 const videosRoutes = require('./routes/videos');
+const adsRoutes = require('./routes/ads');
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -68,6 +69,7 @@ app.post('/api/v1/ingest', async (req, res) => {
 // ── Routes ─────────────────────────────────
 app.use('/api/v1/articles', articlesRoutes);
 app.use('/api/v1/videos', videosRoutes);
+app.use('/api/v1/ads', adsRoutes);
 
 // ── Admin: manual ingestion trigger ────────
 app.post('/admin/ingest', async (req, res) => {

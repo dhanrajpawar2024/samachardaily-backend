@@ -1,6 +1,7 @@
 import Link from 'next/link';
-import type { Article, FeedResponse } from '@/lib/api';
+import type { AdPlacement, Article, FeedResponse } from '@/lib/api';
 import { ArticleCard } from './ArticleCard';
+import { AdSlot } from './AdSlot';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface Props {
@@ -9,9 +10,10 @@ interface Props {
   lang: string;
   category: string;
   onOpenArticle?: (article: Article) => void;
+  ads?: AdPlacement[];
 }
 
-export function ArticleGrid({ articles, pagination, lang, category, onOpenArticle }: Props) {
+export function ArticleGrid({ articles, pagination, lang, category, onOpenArticle, ads = [] }: Props) {
   const { page, total, limit } = pagination;
   const totalPages = Math.ceil(total / limit);
 
@@ -29,7 +31,17 @@ export function ArticleGrid({ articles, pagination, lang, category, onOpenArticl
     <div className="mt-4 space-y-6">
       {/* Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-fade-in">
-        {articles.map(a => <ArticleCard key={a.id} article={a} onOpenArticle={onOpenArticle} />)}
+        {articles.flatMap((article, index) => {
+          const insertAds = ads.filter(ad => ad.article_id_after === index + 1);
+          return [
+            <ArticleCard key={article.id} article={article} onOpenArticle={onOpenArticle} />,
+            ...insertAds.map(ad => (
+              <div key={ad.id} className="sm:col-span-2 lg:col-span-3 xl:col-span-4">
+                <AdSlot ad={ad} />
+              </div>
+            )),
+          ];
+        })}
       </div>
 
       {/* Pagination */}

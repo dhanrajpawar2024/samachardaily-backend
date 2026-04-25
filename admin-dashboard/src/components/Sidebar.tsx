@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Newspaper, Rss, BarChart2, Users, Newspaper as Logo } from 'lucide-react';
+import { LayoutDashboard, Newspaper, Rss, BarChart2, Users, Newspaper as Logo, Megaphone } from 'lucide-react';
 import clsx from 'clsx';
 
 const NAV = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard'  },
   { to: '/articles',  icon: Newspaper,       label: 'Articles'   },
+  { to: '/ads',       icon: Megaphone,       label: 'Ads'        },
   { to: '/sources',   icon: Rss,             label: 'Sources'    },
   { to: '/analytics', icon: BarChart2,       label: 'Analytics'  },
   { to: '/users',     icon: Users,           label: 'Users'      },

@@ -84,6 +84,11 @@ const storeArticle = async (article) => {
        )
        ON CONFLICT (source_url) DO UPDATE SET
          thumbnail_url = COALESCE(articles.thumbnail_url, EXCLUDED.thumbnail_url),
+         summary = CASE
+           WHEN LENGTH(COALESCE(articles.summary, '')) < LENGTH(COALESCE(EXCLUDED.summary, ''))
+             THEN EXCLUDED.summary
+           ELSE articles.summary
+         END,
          content = CASE
            WHEN LENGTH(COALESCE(articles.content, '')) < LENGTH(COALESCE(EXCLUDED.content, ''))
              THEN EXCLUDED.content

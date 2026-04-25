@@ -2,6 +2,8 @@
  * Data normalization helpers
  */
 
+const { cleanText } = require('./text');
+
 const CATEGORY_MAP = {
   'top-stories':   'top-stories',
   'topstories':    'top-stories',
@@ -37,13 +39,13 @@ const normalizeCategory = (slug = 'top-stories') => {
 };
 
 const normalizeTitle = (title = '') =>
-  title.replace(/\s+/g, ' ').trim().substring(0, 500);
+  cleanText(title, 500);
 
 const normalizeContent = (content = '') =>
-  content.replace(/\s{2,}/g, ' ').trim().substring(0, 10000);
+  cleanText(content, 10000);
 
 const normalizeSummary = (summary = '') =>
-  summary.replace(/<[^>]+>/g, '').replace(/\s{2,}/g, ' ').trim().substring(0, 1000);
+  cleanText(summary, 1000);
 
 const normalizePublishedAt = (date) => {
   if (!date) return new Date();

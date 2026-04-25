@@ -18,6 +18,12 @@
 \echo '→ V15: Creating read_history table...'
 \i /docker-entrypoint-initdb.d/V15__add_read_history.sql
 
+\echo '→ V16: Creating article engagement tables...'
+\i /docker-entrypoint-initdb.d/V16__create_article_engagement.sql
+
+\echo '→ V17: Extending ad placements...'
+\i /docker-entrypoint-initdb.d/V17__extend_ad_placements.sql
+
 \echo ''
 \echo '=== Verification ==='
 SELECT language, COUNT(*) as category_count

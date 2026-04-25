@@ -29,6 +29,7 @@ const getLatestArticles = async (language = 'en', limit = 50, offset = 0, catego
       COALESCE(a.view_count, 0) as view_count,
       COALESCE(a.like_count, 0) as like_count,
       COALESCE(a.share_count, 0) as share_count,
+      COALESCE(a.comment_count, 0) as comment_count,
       COALESCE(a.is_premium, false) as is_premium
      FROM articles a
      LEFT JOIN categories c ON a.category_id = c.id

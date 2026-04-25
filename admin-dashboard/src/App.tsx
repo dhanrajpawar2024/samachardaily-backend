@@ -3,6 +3,7 @@ import { Layout } from './components/Layout';
 import { Dashboard }  from './pages/Dashboard';
 import { Articles }   from './pages/Articles';
 import { Sources }    from './pages/Sources';
+import { Ads }        from './pages/Ads';
 import { Analytics }  from './pages/Analytics';
 import { Users }      from './pages/Users';
 
@@ -14,6 +15,7 @@ export default function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard"  element={<Dashboard />} />
           <Route path="articles"   element={<Articles />} />
+          <Route path="ads"        element={<Ads />} />
           <Route path="sources"    element={<Sources />} />
           <Route path="analytics"  element={<Analytics />} />
           <Route path="users"      element={<Users />} />

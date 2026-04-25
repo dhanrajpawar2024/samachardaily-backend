@@ -5,7 +5,7 @@ const { invalidateFeedCache } = require('./ranking');
 /**
  * Valid interaction actions
  */
-const VALID_ACTIONS = ['view', 'like', 'share', 'bookmark', 'skip', 'unlike'];
+const VALID_ACTIONS = ['view', 'like', 'share', 'bookmark', 'skip', 'unlike', 'comment'];
 
 /**
  * Record user interaction with article
@@ -26,11 +26,12 @@ const recordInteraction = async (userId, articleId, action, metadata = {}) => {
     );
 
     // Update article's trending_score if engagement
-    if (['bookmark', 'share', 'like'].includes(action)) {
+    if (['bookmark', 'share', 'like', 'comment'].includes(action)) {
       const scoreBoost = {
         bookmark: 5,
         share: 10,
         like: 3,
+        comment: 4,
       };
 
       await query(
@@ -88,6 +89,7 @@ const getTrendingArticles = async (language = 'en', limit = 50) => {
         COALESCE(a.view_count, 0) as view_count,
         COALESCE(a.like_count, 0) as like_count,
         COALESCE(a.share_count, 0) as share_count,
+        COALESCE(a.comment_count, 0) as comment_count,
         COALESCE(a.is_premium, false) as is_premium,
         COUNT(DISTINCT uai.user_id) as interaction_count
        FROM articles a

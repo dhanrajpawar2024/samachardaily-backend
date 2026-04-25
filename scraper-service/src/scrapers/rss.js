@@ -5,6 +5,7 @@
 
 const Parser = require('rss-parser');
 const logger = require('../utils/logger');
+const { cleanText, decodeHtmlEntities, firstMeaningfulText } = require('../utils/text');
 
 const rssParser = new Parser({
   timeout: 15000,
@@ -26,12 +27,6 @@ const rssParser = new Parser({
 /**
  * Extract the best thumbnail URL from an RSS item
  */
-const decodeHtmlEntities = (str = '') =>
-  String(str)
-    .replace(/&amp;/gi, '&')
-    .replace(/&#x2F;/gi, '/')
-    .replace(/&#47;/gi, '/');
-
 const stripUrlParamsForImageMatch = (url = '') => {
   const cleaned = String(url).split('?')[0];
   return cleaned;
@@ -91,11 +86,19 @@ const extractThumbnail = (item) => {
 const extractContent = (item) => {
   // Prefer full content:encoded, fallback to description
   const raw = item.contentEncoded || item.content || item.description || '';
-  return raw
-    .replace(/<[^>]+>/g, ' ')     // strip HTML tags
-    .replace(/\s{2,}/g, ' ')      // collapse whitespace
-    .trim()
-    .substring(0, 5000);           // cap at 5000 chars
+  return cleanText(raw, 10000);
+};
+
+const extractSummary = (item) => {
+  const bestText = firstMeaningfulText(
+    item.contentSnippet,
+    item.summary,
+    item.description,
+    item.content,
+    item.contentEncoded
+  );
+
+  return cleanText(bestText, 1000);
 };
 
 /**
@@ -111,7 +114,7 @@ const scrapeRSSSource = async (source) => {
       .filter(item => item.title && item.link)
       .map(item => ({
         title:        (item.title || '').trim().replace(/\s+/g, ' '),
-        summary:      item.contentSnippet || item.summary || '',
+        summary:      extractSummary(item),
         content:      extractContent(item),
         source_url:   item.link,
         thumbnail_url: extractThumbnail(item),

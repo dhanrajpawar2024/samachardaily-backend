@@ -7,8 +7,10 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
 const logger = require('../utils/logger');
+const { cleanText } = require('../utils/text');
 
 const HTTP_TIMEOUT = 12000;
+const ENRICH_MIN_CONTENT_LENGTH = parseInt(process.env.ENRICH_MIN_CONTENT_LENGTH || '1200');
 const HTTP_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (compatible; SamacharDailyBot/1.0)',
   'Accept-Language': 'en,hi;q=0.9,te;q=0.8,*;q=0.5',
@@ -78,10 +80,10 @@ const enrichArticleContent = async (url) => {
         .map((_, el) => $(el).text().trim())
         .get()
         .join('\n')
-        .replace(/\s{2,}/g, ' ')
-        .trim()
-        .substring(0, 8000);
+        .trim();
     }
+
+    content = cleanText(content, 10000);
 
     // Extract OG image as fallback thumbnail
     const ogImage = $('meta[property="og:image"]').attr('content') ||
@@ -96,14 +98,22 @@ const enrichArticleContent = async (url) => {
 
 /**
  * Enrich a batch of articles with full content
- * Only enriches articles where content is too short (< 200 chars)
+ * Enriches articles where RSS content is likely a snippet.
  * @param {Array} articles
  * @param {number} concurrency
  */
 const enrichArticles = async (articles, concurrency = 3) => {
-  const needsEnrichment = articles.filter(a =>
-    !a.content || a.content.length < 200
-  );
+  const needsEnrichment = articles.filter((article) => {
+    const content = cleanText(article.content || '', 0);
+    const summary = cleanText(article.summary || '', 0);
+
+    return (
+      !content ||
+      content.length < ENRICH_MIN_CONTENT_LENGTH ||
+      (summary && content && summary === content) ||
+      /<[^>]+>|&(?:#\d+|#x[0-9a-f]+|[a-z][a-z0-9]+);/i.test(article.content || '')
+    );
+  });
 
   logger.info(`[Web] Enriching ${needsEnrichment.length}/${articles.length} articles`);
 
@@ -112,9 +122,14 @@ const enrichArticles = async (articles, concurrency = 3) => {
     await Promise.allSettled(
       batch.map(async (article) => {
         const { content, thumbnailUrl } = await enrichArticleContent(article.source_url);
-        if (content && content.length > article.content?.length) {
+        if (content && content.length > (article.content?.length || 0)) {
           article.content = content;
         }
+        const cleanedSummary = cleanText(article.summary || '', 1000);
+        const cleanedContent = cleanText(article.content || '', 1000);
+        article.summary = cleanedContent.length > cleanedSummary.length
+          ? cleanedContent
+          : cleanedSummary;
         if (!article.thumbnail_url && thumbnailUrl) {
           article.thumbnail_url = thumbnailUrl;
         }
