@@ -40,3 +40,8 @@ export const API_BASE = typeof window === 'undefined'
   ? INTERNAL_API_BASE
   : PUBLIC_API_BASE;
 
+// Content-service URL (no auth required — bypasses gateway for public endpoints)
+export const CONTENT_BASE = typeof window === 'undefined'
+  ? (process.env.INTERNAL_CONTENT_URL || 'http://content-service.railway.internal:3002')
+  : (process.env.NEXT_PUBLIC_CONTENT_URL || 'https://content-service-production-8177.up.railway.app');
+

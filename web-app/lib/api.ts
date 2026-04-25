@@ -1,4 +1,4 @@
-import { API_BASE } from './constants';
+import { API_BASE, CONTENT_BASE } from './constants';
 
 export interface Article {
   id: string;
@@ -23,6 +23,22 @@ export interface Article {
 export interface FeedResponse {
   articles: Article[];
   pagination: { page: number; limit: number; total: number };
+}
+
+export interface AdPlacement {
+  id: string;
+  position_key: string;
+  name: string;
+  provider: string;
+  placement_type: 'script' | 'image' | 'ad_unit';
+  article_id_after?: number | null;
+  ad_unit_id?: string | null;
+  html_snippet?: string | null;
+  image_url?: string | null;
+  target_url?: string | null;
+  language?: string | null;
+  is_active: boolean;
+  sort_order: number;
 }
 
 export interface SearchResponse {
@@ -65,6 +81,18 @@ export const getTrending = (language = 'en', limit = 10) =>
     `${API_BASE}/api/v1/feed/trending?language=${language}&limit=${limit}`,
     { next: { revalidate: 300 } }
   );
+
+export const getActiveAds = (params: { language?: string; position?: string } = {}) => {
+  const q = new URLSearchParams({
+    ...(params.language && { language: params.language }),
+    ...(params.position && { position: params.position }),
+  });
+  // Call content-service directly — no auth required, bypasses gateway
+  return fetchJson<{ ads: AdPlacement[] }>(
+    `${CONTENT_BASE}/api/v1/ads/active${q.toString() ? `?${q}` : ''}`,
+    { next: { revalidate: 120 } }
+  ).then(payload => payload.ads ?? []);
+};
 
 // ── Articles ──────────────────────────────────────────────────────
 
