@@ -6,38 +6,44 @@ const jwt = require('jsonwebtoken');
  */
 const verifyToken = (token) => {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    return decoded;
+    return jwt.verify(token, process.env.JWT_SECRET);
   } catch (error) {
     throw new Error('Invalid or expired token');
   }
 };
 
 /**
- * Middleware: Verify JWT token
- * Sets req.user with decoded token payload
+ * Middleware: Verify JWT token.
+ * Sets req.user with decoded token payload.
  */
 const jwtMiddleware = (req, res, next) => {
   const method = req.method;
   const path = req.path;
+  const originalPath = (req.originalUrl || '').split('?')[0];
+  const matchesPath = (prefix) => path.startsWith(prefix) || originalPath.startsWith(prefix);
 
-  // Always public
-  if (path === '/health') return next();
-  if (path.startsWith('/api/v1/auth')) return next();
+  // Always public.
+  if (path === '/health' || originalPath === '/health') return next();
+  if (matchesPath('/api/v1/auth')) return next();
 
-  // Public read-only endpoints (GET without token → guest mode)
+  // Public endpoints that can serve guest users.
   const isPublicRead = method === 'GET' && (
-    path.startsWith('/api/v1/categories') ||
-    path.startsWith('/api/v1/articles') ||
-    path.startsWith('/api/v1/feed') ||
-    path.startsWith('/api/v1/search') ||
-    path.startsWith('/api/v1/recommendations')
+    matchesPath('/api/v1/categories') ||
+    matchesPath('/api/v1/articles') ||
+    matchesPath('/api/v1/ads/active') ||
+    path.startsWith('/ads/active') ||
+    originalPath.startsWith('/ads/active') ||
+    matchesPath('/api/v1/feed') ||
+    matchesPath('/api/v1/search') ||
+    matchesPath('/api/v1/recommendations')
   );
+  const isPublicArticleView = method === 'POST' && /^\/api\/v1\/articles\/[^/]+\/view$/.test(path);
+  const allowGuest = isPublicRead || isPublicArticleView;
 
   const token = req.headers.authorization?.split(' ')[1];
 
   if (!token) {
-    if (isPublicRead) return next(); // guest access allowed
+    if (allowGuest) return next();
     return res.status(401).json({
       success: false,
       error: 'Missing authorization token',
@@ -51,7 +57,7 @@ const jwtMiddleware = (req, res, next) => {
     req.userId = decoded.userId || decoded.sub;
     next();
   } catch (error) {
-    if (isPublicRead) return next(); // degraded — serve without user context
+    if (allowGuest) return next();
     res.status(401).json({
       success: false,
       error: 'Invalid or expired token',
