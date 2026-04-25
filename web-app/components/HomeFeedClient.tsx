@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { ArrowLeft, Clock, ExternalLink, Eye, Share2, X } from 'lucide-react';
 import { API_BASE } from '@/lib/constants';
-import type { Article, FeedResponse } from '@/lib/api';
+import type { AdPlacement, Article, FeedResponse } from '@/lib/api';
 import { TrendingBanner } from './TrendingBanner';
 import { ArticleGrid } from './ArticleGrid';
 import { RemoteImage } from './RemoteImage';
+import { AdSlot } from './AdSlot';
 
 interface Props {
   trending: Article[];
@@ -17,9 +18,10 @@ interface Props {
   };
   lang: string;
   category: string;
+  ads?: AdPlacement[];
 }
 
-export function HomeFeedClient({ trending, feed, lang, category }: Props) {
+export function HomeFeedClient({ trending, feed, lang, category, ads = [] }: Props) {
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [detailArticle, setDetailArticle] = useState<Article | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -80,8 +82,13 @@ export function HomeFeedClient({ trending, feed, lang, category }: Props) {
   const bodyParagraphs = (article?.content || '')
     .split('\n').map(p => p.trim()).filter(Boolean);
 
+  const articleInlineAd = ads.find(ad => ad.position_key === 'article_inline');
+  const articleBottomAd = ads.find(ad => ad.position_key === 'article_bottom');
+
   return (
     <>
+      <AdSlot ad={ads.find(ad => ad.position_key === 'home_top')} />
+
       {trending.length > 0 && (
         <section>
           <h2 className="flex items-center gap-2 text-lg font-bold text-slate-800 dark:text-slate-100 mb-3">
@@ -98,6 +105,7 @@ export function HomeFeedClient({ trending, feed, lang, category }: Props) {
           lang={lang}
           category={category}
           onOpenArticle={handleOpen}
+          ads={ads.filter(ad => ad.position_key.startsWith('feed_after_'))}
         />
       </section>
 
@@ -170,6 +178,8 @@ export function HomeFeedClient({ trending, feed, lang, category }: Props) {
                   </p>
                 )}
 
+                <AdSlot ad={articleInlineAd} />
+
                 <div className="prose prose-sm sm:prose-base prose-slate dark:prose-invert max-w-none prose-p:leading-relaxed">
                   {bodyParagraphs.length > 0
                     ? bodyParagraphs.map((p, i) => <p key={i}>{p}</p>)
@@ -179,6 +189,7 @@ export function HomeFeedClient({ trending, feed, lang, category }: Props) {
 
                 {/* Read more CTA — prominent, always visible */}
                 <div className="pt-2 pb-1">
+                  <AdSlot ad={articleBottomAd} className="mb-4" />
                   <a
                     href={article.source_url}
                     target="_blank"

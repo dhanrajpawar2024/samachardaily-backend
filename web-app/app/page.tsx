@@ -1,4 +1,4 @@
-import { getTrending, getFeed } from '@/lib/api';
+import { getTrending, getFeed, getActiveAds } from '@/lib/api';
 import { CategoryTabs } from '@/components/CategoryTabs';
 import { LanguageSelector } from '@/components/LanguageSelector';
 import { HomeFeedClient } from '@/components/HomeFeedClient';
@@ -13,13 +13,15 @@ export default async function HomePage({ searchParams }: HomeProps) {
   const category = rawCategory || 'top-stories';
   const page     = Number(rawPage || 1);
 
-  const [trendingResult, feedResult] = await Promise.allSettled([
+  const [trendingResult, feedResult, adsResult] = await Promise.allSettled([
     getTrending(lang, 8),
     getFeed({ language: lang, category, page, limit: 20 }),
+    getActiveAds({ language: lang }),
   ]);
 
   const trending = trendingResult.status === 'fulfilled' ? trendingResult.value : [];
   const feed     = feedResult.status     === 'fulfilled' ? feedResult.value     : { articles: [], pagination: { page: 1, limit: 20, total: 0 } };
+  const ads      = adsResult.status      === 'fulfilled' ? adsResult.value      : [];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
@@ -29,7 +31,7 @@ export default async function HomePage({ searchParams }: HomeProps) {
 
       {/* Category Tabs + Feed */}
       <CategoryTabs activeCategory={category} lang={lang} />
-      <HomeFeedClient trending={trending} feed={feed} lang={lang} category={category} />
+      <HomeFeedClient trending={trending} feed={feed} lang={lang} category={category} ads={ads} />
     </div>
   );
 }
