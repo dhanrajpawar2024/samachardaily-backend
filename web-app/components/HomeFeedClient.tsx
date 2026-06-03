@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { formatDistanceToNow } from 'date-fns';
 import { ArrowLeft, Clock, ExternalLink, Eye, Share2, X } from 'lucide-react';
 import { API_BASE } from '@/lib/constants';
 import type { AdPlacement, Article, FeedResponse } from '@/lib/api';
@@ -9,6 +8,7 @@ import { TrendingBanner } from './TrendingBanner';
 import { ArticleGrid } from './ArticleGrid';
 import { RemoteImage } from './RemoteImage';
 import { AdSlot } from './AdSlot';
+import { formatRelativeTime, getCleanSummary } from '@/lib/formatters';
 
 interface Props {
   trending: Article[];
@@ -74,13 +74,12 @@ export function HomeFeedClient({ trending, feed, lang, category, ads = [] }: Pro
     }
   };
 
-  const publishedDate = article?.published_at ? new Date(article.published_at) : null;
-  const timeAgo = publishedDate && !isNaN(publishedDate.getTime())
-    ? formatDistanceToNow(publishedDate, { addSuffix: true })
-    : 'recently';
+  const timeAgo = article ? formatRelativeTime(article.published_at) : 'Just now';
 
-  const bodyParagraphs = (article?.content || '')
-    .split('\n').map(p => p.trim()).filter(Boolean);
+  const cleanSummary = article ? getCleanSummary(article.title, article.summary, article.content) : '';
+  const summaryLines = cleanSummary
+    ? cleanSummary.split(/(?<=[.!?])\s+/).filter(Boolean).slice(0, 4)
+    : [];
 
   const articleInlineAd = ads.find(ad => ad.position_key === 'article_inline');
   const articleBottomAd = ads.find(ad => ad.position_key === 'article_bottom');
@@ -171,21 +170,18 @@ export function HomeFeedClient({ trending, feed, lang, category, ads = [] }: Pro
                   {isLoading && <span className="text-brand-600 dark:text-brand-400 animate-pulse">Loading…</span>}
                 </div>
 
-                {/* Summary / content */}
-                {article.summary && (
+                {/* Summary only (aggregator-safe preview) */}
+                {cleanSummary && (
                   <p className="text-base font-medium text-slate-700 dark:text-slate-200 leading-relaxed border-l-4 border-brand-500 pl-3">
-                    {article.summary}
+                    {summaryLines.join(' ') || cleanSummary}
                   </p>
                 )}
 
                 <AdSlot ad={articleInlineAd} />
 
-                <div className="prose prose-sm sm:prose-base prose-slate dark:prose-invert max-w-none prose-p:leading-relaxed">
-                  {bodyParagraphs.length > 0
-                    ? bodyParagraphs.map((p, i) => <p key={i}>{p}</p>)
-                    : !article.summary && <p className="text-slate-400 italic">Preview not available for this article.</p>
-                  }
-                </div>
+                {!cleanSummary && (
+                  <p className="text-slate-400 italic">Preview not available for this article.</p>
+                )}
 
                 {/* Read more CTA — prominent, always visible */}
                 <div className="pt-2 pb-1">
@@ -197,10 +193,10 @@ export function HomeFeedClient({ trending, feed, lang, category, ads = [] }: Pro
                     className="flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-semibold text-sm transition-colors shadow"
                   >
                     <ExternalLink size={16} />
-                    Read full article on {article.source_name}
+                    Read full story at {article.source_name}
                   </a>
                   <p className="text-center text-xs text-slate-400 mt-2">
-                    Opens the original source in a new tab
+                    This app shows short summaries only. Full story opens on the original publisher.
                   </p>
                 </div>
               </div>

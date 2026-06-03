@@ -134,6 +134,14 @@ const runScrapeJob = async (opts = {}) => {
   // Step 2: Normalize
   articles = articles.map(normalizeArticle);
 
+  // Step 2.5: Reject invalid timestamps so ordering/ranking stays sane.
+  const beforeTimestampFilter = articles.length;
+  articles = articles.filter(article => article.published_at instanceof Date);
+  const droppedInvalidPublishedAt = beforeTimestampFilter - articles.length;
+  if (droppedInvalidPublishedAt > 0) {
+    logger.warn(`[Job] Dropped ${droppedInvalidPublishedAt} articles with invalid published_at`);
+  }
+
   // Step 3: Deduplicate
   articles = await filterDuplicates(articles);
 
@@ -178,6 +186,7 @@ const runScrapeJob = async (opts = {}) => {
     duration_seconds: parseFloat(duration),
     sources: rssSources.length,
     fetched: articles.length + /* duplicates already filtered */ 0,
+    dropped_invalid_published_at: droppedInvalidPublishedAt,
     ingested,
     failed,
     new_article_ids_count: newArticleIds.length,

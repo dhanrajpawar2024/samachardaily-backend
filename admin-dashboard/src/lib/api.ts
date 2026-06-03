@@ -1,5 +1,6 @@
 export const API_BASE    = import.meta.env.VITE_API_URL     || 'http://localhost:3000';
 export const SCRAPER_BASE = import.meta.env.VITE_SCRAPER_URL || 'http://localhost:3007';
+export const WEB_BASE = import.meta.env.VITE_WEB_URL || 'https://samachardaily.in';
 
 const SUPABASE_URL =
   import.meta.env.VITE_SUPABASE_URL ||
@@ -46,13 +47,27 @@ export const getArticles = async (params: Record<string,string|number> = {}) => 
   const to = from + limit - 1;
 
   const q = new URLSearchParams({
-    select: 'id,title,source_name,language,published_at,view_count,like_count,share_count,is_published,author,thumbnail_url,categories!left(slug)',
-    is_published: 'eq.true',
+    select: 'id,title,summary,source_url,source_name,language,published_at,view_count,like_count,share_count,is_published,author,thumbnail_url,categories!left(slug)',
     order: 'published_at.desc',
   });
 
+  const publication = String(params.publication || 'published');
+  if (publication === 'published') q.set('is_published', 'eq.true');
+  if (publication === 'hidden') q.set('is_published', 'eq.false');
+
   if (params.language) {
     q.set('language', `eq.${String(params.language)}`);
+  }
+
+  if (params.source) {
+    q.set('source_name', `ilike.*${String(params.source).trim()}*`);
+  }
+
+  if (params.hasImage === 'yes') {
+    q.set('thumbnail_url', 'not.is.null');
+  }
+  if (params.hasImage === 'no') {
+    q.set('thumbnail_url', 'is.null');
   }
 
   const url = `${SUPABASE_URL}/rest/v1/articles?${q.toString()}`;
@@ -77,7 +92,33 @@ export const getArticles = async (params: Record<string,string|number> = {}) => 
     articles: (res.articles ?? []).map(normalizeAdminArticle),
   };
 };
-export const deleteArticle = (id: string) => del(`${API_BASE}/api/v1/articles/${id}`);
+export const deleteArticle = async (id: string) => {
+  try {
+    await del(`${API_BASE}/api/v1/articles/${id}`);
+    return;
+  } catch {
+    const url = `${SUPABASE_URL}/rest/v1/articles?id=eq.${id}`;
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: withSupabaseHeaders({ Prefer: 'return=minimal' }),
+    });
+    if (!response.ok) throw new Error(`${response.status} ${url}`);
+  }
+};
+
+export const setArticlePublished = async (id: string, isPublished: boolean) => {
+  const url = `${SUPABASE_URL}/rest/v1/articles?id=eq.${id}`;
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: withSupabaseHeaders({
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+    }),
+    body: JSON.stringify({ is_published: isPublished }),
+  });
+  if (!response.ok) throw new Error(`${response.status} ${url}`);
+  return response.json();
+};
 
 // ── Feed Stats ───────────────────────────────────────────────────
 export const getFeedStats = () => get<FeedStats>(`${API_BASE}/api/v1/feed/stats`);
@@ -125,6 +166,8 @@ export const deleteAd = (id: string) => del(`${API_BASE}/api/v1/ads/${id}`);
 interface RawAdminArticle {
   id: string;
   title?: string;
+  summary?: string;
+  source_url?: string;
   source_name?: string;
   language?: string;
   category?: string;
@@ -141,6 +184,7 @@ interface RawAdminArticle {
 
 export interface AdminArticle {
   id: string; title: string; source_name: string; language: string;
+  summary?: string; source_url?: string;
   category_slug?: string; published_at: string; view_count: number;
   like_count: number; share_count: number; is_published: boolean;
   author?: string; thumbnail_url?: string;
@@ -149,6 +193,8 @@ export interface AdminArticle {
 const normalizeAdminArticle = (article: RawAdminArticle): AdminArticle => ({
   id: article.id,
   title: article.title || 'Untitled article',
+  summary: article.summary || undefined,
+  source_url: article.source_url || undefined,
   source_name: article.source_name || 'Unknown source',
   language: article.language || 'unknown',
   category_slug: article.category_slug || article.categories?.slug || article.category || undefined,

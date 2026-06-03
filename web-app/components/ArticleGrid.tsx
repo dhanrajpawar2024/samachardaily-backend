@@ -28,9 +28,9 @@ export function ArticleGrid({ articles, pagination, lang, category, onOpenArticl
   }
 
   return (
-    <div className="mt-4 space-y-6">
+    <div className="mt-4 space-y-6 sm:space-y-7">
       {/* Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-fade-in">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 sm:gap-4 animate-fade-in">
         {articles.flatMap((article, index) => {
           const insertAds = ads.filter(ad => ad.article_id_after === index + 1);
           return [
@@ -46,22 +46,22 @@ export function ArticleGrid({ articles, pagination, lang, category, onOpenArticl
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-3 pt-4">
+        <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 pt-4">
           {page > 1 && (
             <Link
               href={`/?lang=${lang}&category=${category}&page=${page - 1}`}
-              className="flex items-center gap-1 px-4 py-2 rounded-lg border border-slate-300
+              className="flex items-center gap-1 px-3.5 sm:px-4 py-2 rounded-lg border border-slate-300
                          dark:border-slate-600 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
               <ChevronLeft size={16} /> Prev
             </Link>
           )}
-          <span className="text-sm text-slate-500">
+          <span className="text-sm text-slate-500 px-1">
             Page <strong className="text-slate-800 dark:text-slate-100">{page}</strong> of {totalPages}
           </span>
           {page < totalPages && (
             <Link
               href={`/?lang=${lang}&category=${category}&page=${page + 1}`}
-              className="flex items-center gap-1 px-4 py-2 rounded-lg border border-slate-300
+              className="flex items-center gap-1 px-3.5 sm:px-4 py-2 rounded-lg border border-slate-300
                          dark:border-slate-600 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
               Next <ChevronRight size={16} />
             </Link>

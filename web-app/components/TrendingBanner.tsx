@@ -3,8 +3,8 @@
 import { useRef } from 'react';
 import { ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
 import type { Article } from '@/lib/api';
-import { formatDistanceToNow } from 'date-fns';
 import { RemoteImage } from './RemoteImage';
+import { formatRelativeTime } from '@/lib/formatters';
 
 interface Props {
   articles: Article[];
@@ -14,6 +14,7 @@ interface Props {
 
 export function TrendingBanner({ articles, lang, onOpenArticle }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  void lang;
 
   const scroll = (dir: 'left' | 'right') => {
     if (!scrollRef.current) return;
@@ -24,21 +25,21 @@ export function TrendingBanner({ articles, lang, onOpenArticle }: Props) {
     <div className="relative group">
       {/* Scroll Buttons */}
       <button onClick={() => scroll('left')}
-        className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 z-10 bg-white dark:bg-slate-800
+        className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 sm:-translate-x-3 z-10 bg-white dark:bg-slate-800
                    shadow-lg rounded-full p-1.5 border border-slate-200 dark:border-slate-600
-                   opacity-0 group-hover:opacity-100 transition-opacity">
+                   opacity-95 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
         <ChevronLeft size={18} />
       </button>
       <button onClick={() => scroll('right')}
-        className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-3 z-10 bg-white dark:bg-slate-800
+        className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1 sm:translate-x-3 z-10 bg-white dark:bg-slate-800
                    shadow-lg rounded-full p-1.5 border border-slate-200 dark:border-slate-600
-                   opacity-0 group-hover:opacity-100 transition-opacity">
+                   opacity-95 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
         <ChevronRight size={18} />
       </button>
 
       {/* Cards */}
       <div ref={scrollRef}
-        className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory">
+        className="flex gap-3 sm:gap-4 overflow-x-auto pb-2.5 scrollbar-hide snap-x snap-mandatory scroll-smooth pr-1">
         {articles.map((article, i) => (
           <TrendingCard
             key={article.id}
@@ -57,7 +58,7 @@ function TrendingCard({ article, rank, onOpenArticle }: {
   rank: number;
   onOpenArticle?: (article: Article) => void;
 }) {
-  const timeAgo = formatDistanceToNow(new Date(article.published_at), { addSuffix: true });
+  const timeAgo = formatRelativeTime(article.published_at);
   const articleHref = `/article/${article.id}`;
 
   return (
@@ -67,7 +68,7 @@ function TrendingCard({ article, rank, onOpenArticle }: {
         e.preventDefault();
         onOpenArticle(article);
       }}
-      className="relative flex-shrink-0 w-64 sm:w-72 card snap-start group overflow-hidden">
+      className="relative flex-shrink-0 w-[78vw] max-w-[19rem] sm:w-72 card snap-start group overflow-hidden">
       {/* Thumbnail */}
       <div className="relative h-40 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800">
         {article.thumbnail_url ? (

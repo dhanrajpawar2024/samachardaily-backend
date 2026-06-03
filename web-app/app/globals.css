@@ -6,6 +6,15 @@
   .ad-slot {
     @apply w-full rounded-lg border border-dashed border-slate-200 bg-slate-50/80 p-3 text-center dark:border-slate-700 dark:bg-slate-900/60;
   }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @layer base {

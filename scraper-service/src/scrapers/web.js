@@ -11,6 +11,7 @@ const { cleanText } = require('../utils/text');
 
 const HTTP_TIMEOUT = 12000;
 const ENRICH_MIN_CONTENT_LENGTH = parseInt(process.env.ENRICH_MIN_CONTENT_LENGTH || '1200');
+const SUMMARY_MAX_LENGTH = parseInt(process.env.SUMMARY_MAX_LENGTH || '260');
 const HTTP_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (compatible; SamacharDailyBot/1.0)',
   'Accept-Language': 'en,hi;q=0.9,te;q=0.8,*;q=0.5',
@@ -50,6 +51,43 @@ const SITE_SELECTORS = {
   'navbharattimes.indiatimes.com': '.normal, ._3YrNV',
 };
 
+const SITE_IMAGE_SELECTORS = {
+  'timesofindia.indiatimes.com': [
+    'meta[property="og:image"]',
+    'meta[property="og:image:secure_url"]',
+    'meta[name="twitter:image"]',
+    'meta[name="twitter:image:src"]',
+    'img[fetchpriority="high"]',
+  ],
+  'www.thehindu.com': [
+    'meta[property="og:image"]',
+    'meta[name="twitter:image"]',
+    'figure img',
+  ],
+  'www.ndtv.com': [
+    'meta[property="og:image"]',
+    'meta[name="twitter:image"]',
+    '.ins_storybody img',
+  ],
+};
+
+const getBestImageFromDom = ($, selectors = []) => {
+  for (const selector of selectors) {
+    const node = $(selector).first();
+    if (!node || node.length === 0) continue;
+
+    const value =
+      node.attr('content') ||
+      node.attr('src') ||
+      node.attr('data-src') ||
+      node.attr('srcset')?.split(',')[0]?.trim().split(' ')[0] ||
+      null;
+
+    if (value && /^https?:\/\//i.test(value)) return value;
+  }
+  return null;
+};
+
 /**
  * Extract full article text from a URL
  * @param {string} url
@@ -85,9 +123,16 @@ const enrichArticleContent = async (url) => {
 
     content = cleanText(content, 10000);
 
-    // Extract OG image as fallback thumbnail
-    const ogImage = $('meta[property="og:image"]').attr('content') ||
-                    $('meta[name="twitter:image"]').attr('content') || null;
+    const imageSelectors = SITE_IMAGE_SELECTORS[hostname] || [
+      'meta[property="og:image"]',
+      'meta[property="og:image:secure_url"]',
+      'meta[name="twitter:image"]',
+      'meta[name="twitter:image:src"]',
+      'link[rel="image_src"]',
+      'article img',
+    ];
+
+    const ogImage = getBestImageFromDom($, imageSelectors);
 
     return { content, thumbnailUrl: ogImage };
   } catch (err) {
@@ -127,9 +172,10 @@ const enrichArticles = async (articles, concurrency = 3) => {
         }
         const cleanedSummary = cleanText(article.summary || '', 1000);
         const cleanedContent = cleanText(article.content || '', 1000);
-        article.summary = cleanedContent.length > cleanedSummary.length
-          ? cleanedContent
-          : cleanedSummary;
+        const bestSummary = cleanedSummary || cleanedContent;
+        article.summary = bestSummary.length > SUMMARY_MAX_LENGTH
+          ? `${bestSummary.slice(0, SUMMARY_MAX_LENGTH - 3)}...`
+          : bestSummary;
         if (!article.thumbnail_url && thumbnailUrl) {
           article.thumbnail_url = thumbnailUrl;
         }

@@ -5,8 +5,8 @@ import { getArticle, getTrending } from '@/lib/api';
 import { ArticleCard } from '@/components/ArticleCard';
 import { ShareButton } from '@/components/ShareButton';
 import { RemoteImage } from '@/components/RemoteImage';
-import { formatDistanceToNow } from 'date-fns';
 import { Clock, ExternalLink, Eye } from 'lucide-react';
+import { formatRelativeTime, getCleanSummary } from '@/lib/formatters';
 
 interface Props { params: Promise<{ id: string }> }
 
@@ -41,11 +41,11 @@ export default async function ArticlePage({ params }: Props) {
 
   const related = await getTrending(article.language, 4).catch(() => []);
 
-  const publishedDate = article.published_at ? new Date(article.published_at) : null;
-  const timeAgo = publishedDate && !isNaN(publishedDate.getTime())
-    ? formatDistanceToNow(publishedDate, { addSuffix: true })
-    : 'recently';
-  const bodyText = article.content || article.summary;
+  const timeAgo = formatRelativeTime(article.published_at);
+  const cleanSummary = getCleanSummary(article.title, article.summary, article.content);
+  const previewText = cleanSummary
+    ? cleanSummary.split(/(?<=[.!?])\s+/).filter(Boolean).slice(0, 4).join(' ')
+    : '';
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -97,14 +97,17 @@ export default async function ArticlePage({ params }: Props) {
             </div>
           )}
 
-          {/* Content */}
+          {/* Aggregator-safe preview */}
           <div className="prose prose-slate dark:prose-invert max-w-none prose-p:text-base prose-p:leading-relaxed">
-            {bodyText ? (
-              bodyText.split('\n').filter(Boolean).map((para, i) => (
-                <p key={i}>{para}</p>
-              ))
+            {previewText ? (
+              <>
+                <p>{previewText}</p>
+                <p className="text-sm text-slate-500">
+                  SamacharDaily shows a short preview only. Read the full story on the original publisher.
+                </p>
+              </>
             ) : (
-              <p className="text-slate-500 italic">Full article content not available.</p>
+              <p className="text-slate-500 italic">Preview not available for this article.</p>
             )}
           </div>
 
@@ -117,7 +120,7 @@ export default async function ArticlePage({ params }: Props) {
               rel="noopener noreferrer"
               className="flex items-center gap-2 btn-primary"
             >
-              <ExternalLink size={15} /> Read on {article.source_name}
+              <ExternalLink size={15} /> Read full story at {article.source_name}
             </a>
           </div>
         </article>
