@@ -84,7 +84,7 @@ const mapArticle = (row: any): Article => ({
   source_name: row.source_name,
   author: row.author,
   language: row.language,
-  country_code: row.country_code,
+  country_code: undefined,
   category_id: row.category_id,
   category_slug: row.categories?.slug,
   published_at: row.published_at,
@@ -110,14 +110,14 @@ export const getFeed = (params: {
   const to = from + limit - 1;
 
   const query = new URLSearchParams({
-    select: 'id,title,summary,content,thumbnail_url,source_url,source_name,author,language,country_code,category_id,published_at,trending_score,view_count,like_count,share_count,is_premium,categories!left(slug)',
+    select: 'id,title,summary,content,thumbnail_url,source_url,source_name,author,language,category_id,published_at,trending_score,view_count,like_count,share_count,is_premium,categories!left(slug)',
     is_published: 'eq.true',
     order: 'published_at.desc',
   });
 
   if (params.language) query.set('language', `eq.${params.language}`);
   if (params.category && params.category !== 'top-stories') query.set('categories.slug', `eq.${params.category}`);
-  if (params.country) query.set('country_code', `eq.${params.country.toLowerCase()}`);
+  // country filter omitted in minimal mode (country_code column not present).
 
   const url = `${SUPABASE_URL}/rest/v1/articles?${query.toString()}`;
 
@@ -132,7 +132,7 @@ export const getFeed = (params: {
 
     if (total === 0 && params.language) {
       const fallbackQuery = new URLSearchParams({
-        select: 'id,title,summary,content,thumbnail_url,source_url,source_name,author,language,country_code,category_id,published_at,trending_score,view_count,like_count,share_count,is_premium,categories!left(slug)',
+        select: 'id,title,summary,content,thumbnail_url,source_url,source_name,author,language,category_id,published_at,trending_score,view_count,like_count,share_count,is_premium,categories!left(slug)',
         is_published: 'eq.true',
         order: 'published_at.desc',
       });
@@ -158,12 +158,13 @@ export const getFeed = (params: {
 
 export const getTrending = (language = 'en', limit = 10, country?: string) =>
   fetchJson<any[]>(
-    `${SUPABASE_URL}/rest/v1/articles?select=id,title,summary,content,thumbnail_url,source_url,source_name,author,language,country_code,category_id,published_at,trending_score,view_count,like_count,share_count,is_premium,categories!left(slug)&is_published=eq.true&language=eq.${language}${country ? `&country_code=eq.${country.toLowerCase()}` : ''}&order=trending_score.desc,published_at.desc&limit=${limit}`,
+    `${SUPABASE_URL}/rest/v1/articles?select=id,title,summary,content,thumbnail_url,source_url,source_name,author,language,category_id,published_at,trending_score,view_count,like_count,share_count,is_premium,categories!left(slug)&is_published=eq.true&language=eq.${language}&order=trending_score.desc,published_at.desc&limit=${limit}`,
     { next: { revalidate: 300 } }
   ).then(async (rows) => {
+    void country;
     if ((rows || []).length > 0) return (rows || []).map(mapArticle);
     const fallback = await fetchJson<any[]>(
-      `${SUPABASE_URL}/rest/v1/articles?select=id,title,summary,content,thumbnail_url,source_url,source_name,author,language,country_code,category_id,published_at,trending_score,view_count,like_count,share_count,is_premium,categories!left(slug)&is_published=eq.true&order=trending_score.desc,published_at.desc&limit=${limit}`,
+      `${SUPABASE_URL}/rest/v1/articles?select=id,title,summary,content,thumbnail_url,source_url,source_name,author,language,category_id,published_at,trending_score,view_count,like_count,share_count,is_premium,categories!left(slug)&is_published=eq.true&order=trending_score.desc,published_at.desc&limit=${limit}`,
       { next: { revalidate: 300 } }
     );
     return (fallback || []).map(mapArticle);
@@ -171,9 +172,9 @@ export const getTrending = (language = 'en', limit = 10, country?: string) =>
 
 export const getActiveAds = (params: { language?: string; position?: string } = {}) => {
   const q = new URLSearchParams({
-    select: 'id,position_key,name,provider,placement_type,article_id_after,ad_unit_id,html_snippet,image_url,target_url,language,is_active,sort_order',
+    select: 'id,position_key,article_id_after,ad_unit_id,language,is_active',
     is_active: 'eq.true',
-    order: 'sort_order.asc',
+    order: 'created_at.desc',
     ...(params.language && { language: params.language }),
     ...(params.position && { position_key: `eq.${params.position}` }),
   });
@@ -187,7 +188,7 @@ export const getActiveAds = (params: { language?: string; position?: string } = 
 
 export const getArticle = (id: string) =>
   fetchJson<any[]>(
-    `${SUPABASE_URL}/rest/v1/articles?select=id,title,summary,content,thumbnail_url,source_url,source_name,author,language,country_code,category_id,published_at,trending_score,view_count,like_count,share_count,is_premium,categories!left(slug)&id=eq.${id}&limit=1`,
+    `${SUPABASE_URL}/rest/v1/articles?select=id,title,summary,content,thumbnail_url,source_url,source_name,author,language,category_id,published_at,trending_score,view_count,like_count,share_count,is_premium,categories!left(slug)&id=eq.${id}&limit=1`,
     { next: { revalidate: 3600 } }
   ).then((rows) => {
     if (!rows?.length) throw new Error('Article not found');
@@ -201,7 +202,7 @@ export const searchArticles = (q: string, language?: string, page = 1) => {
   const from = (page - 1) * limit;
   const to = from + limit - 1;
   const params = new URLSearchParams({
-    select: 'id,title,summary,content,thumbnail_url,source_url,source_name,author,language,country_code,category_id,published_at,trending_score,view_count,like_count,share_count,is_premium,categories!left(slug)',
+    select: 'id,title,summary,content,thumbnail_url,source_url,source_name,author,language,category_id,published_at,trending_score,view_count,like_count,share_count,is_premium,categories!left(slug)',
     is_published: 'eq.true',
     or: `(title.ilike.*${q}*,summary.ilike.*${q}*,content.ilike.*${q}*)`,
     ...(language && { language: `eq.${language}` }),
@@ -249,7 +250,7 @@ export const getVideos = (params: { language?: string; page?: number; limit?: nu
   const to = from + limit - 1;
 
   const q = new URLSearchParams({
-    select: 'id,title,description,video_url,thumbnail_url,author_name,language,category_name,view_count,like_count,published_at',
+    select: 'id,title,description,video_url,thumbnail_url,author_name,language,view_count,like_count,published_at',
     ...(params.language && { language: `eq.${params.language}` }),
     order: 'published_at.desc',
   });
