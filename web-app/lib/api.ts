@@ -126,9 +126,29 @@ export const getFeed = (params: {
     next: { revalidate: 120 },
   }).then(async (res) => {
     if (!res.ok) throw new Error(`API error ${res.status}: ${url}`);
-    const rows = await res.json();
-    const contentRange = res.headers.get('content-range') || '0-0/0';
-    const total = Number(contentRange.split('/')[1] || 0);
+    let rows = await res.json();
+    let contentRange = res.headers.get('content-range') || '0-0/0';
+    let total = Number(contentRange.split('/')[1] || 0);
+
+    if (total === 0 && params.language) {
+      const fallbackQuery = new URLSearchParams({
+        select: 'id,title,summary,content,thumbnail_url,source_url,source_name,author,language,country_code,category_id,published_at,trending_score,view_count,like_count,share_count,is_premium,categories!left(slug)',
+        is_published: 'eq.true',
+        order: 'published_at.desc',
+      });
+      if (params.category && params.category !== 'top-stories') fallbackQuery.set('categories.slug', `eq.${params.category}`);
+      const fallbackUrl = `${SUPABASE_URL}/rest/v1/articles?${fallbackQuery.toString()}`;
+      const fallbackRes = await fetch(fallbackUrl, {
+        headers: withSupabaseHeaders({ Range: `${from}-${to}`, Prefer: 'count=exact' }),
+        next: { revalidate: 120 },
+      });
+      if (fallbackRes.ok) {
+        rows = await fallbackRes.json();
+        contentRange = fallbackRes.headers.get('content-range') || '0-0/0';
+        total = Number(contentRange.split('/')[1] || 0);
+      }
+    }
+
     return {
       articles: (rows || []).map(mapArticle),
       pagination: { page, limit, total },
@@ -140,7 +160,14 @@ export const getTrending = (language = 'en', limit = 10, country?: string) =>
   fetchJson<any[]>(
     `${SUPABASE_URL}/rest/v1/articles?select=id,title,summary,content,thumbnail_url,source_url,source_name,author,language,country_code,category_id,published_at,trending_score,view_count,like_count,share_count,is_premium,categories!left(slug)&is_published=eq.true&language=eq.${language}${country ? `&country_code=eq.${country.toLowerCase()}` : ''}&order=trending_score.desc,published_at.desc&limit=${limit}`,
     { next: { revalidate: 300 } }
-  ).then((rows) => (rows || []).map(mapArticle));
+  ).then(async (rows) => {
+    if ((rows || []).length > 0) return (rows || []).map(mapArticle);
+    const fallback = await fetchJson<any[]>(
+      `${SUPABASE_URL}/rest/v1/articles?select=id,title,summary,content,thumbnail_url,source_url,source_name,author,language,country_code,category_id,published_at,trending_score,view_count,like_count,share_count,is_premium,categories!left(slug)&is_published=eq.true&order=trending_score.desc,published_at.desc&limit=${limit}`,
+      { next: { revalidate: 300 } }
+    );
+    return (fallback || []).map(mapArticle);
+  });
 
 export const getActiveAds = (params: { language?: string; position?: string } = {}) => {
   const q = new URLSearchParams({
