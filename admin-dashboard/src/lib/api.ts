@@ -1,6 +1,20 @@
 export const API_BASE    = import.meta.env.VITE_API_URL     || 'http://localhost:3000';
 export const SCRAPER_BASE = import.meta.env.VITE_SCRAPER_URL || 'http://localhost:3007';
 
+const SUPABASE_URL =
+  import.meta.env.VITE_SUPABASE_URL ||
+  'https://ixbxzqmrqeyxktnqrvhp.supabase.co';
+
+const SUPABASE_PUBLISHABLE_KEY =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  'sb_publishable_piOF1BU6q6hjX4o2PLPtsA_vBYWVDD5';
+
+const withSupabaseHeaders = (headers: HeadersInit = {}) => ({
+  apikey: SUPABASE_PUBLISHABLE_KEY,
+  Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+  ...headers,
+});
+
 const get = async <T>(url: string): Promise<T> => {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${res.status} ${url}`);
@@ -26,8 +40,38 @@ const del = async (url: string) => {
 
 // ── Articles ─────────────────────────────────────────────────────
 export const getArticles = async (params: Record<string,string|number> = {}) => {
-  const q = new URLSearchParams(Object.entries(params).map(([k,v]) => [k, String(v)]));
-  const res = await get<{ articles: RawAdminArticle[]; pagination: Pagination }>(`${API_BASE}/api/v1/articles?${q}`);
+  const page = Number(params.page || 1);
+  const limit = Number(params.limit || 20);
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
+
+  const q = new URLSearchParams({
+    select: 'id,title,source_name,language,published_at,view_count,like_count,share_count,is_published,author,thumbnail_url,categories!left(slug)',
+    is_published: 'eq.true',
+    order: 'published_at.desc',
+  });
+
+  if (params.language) {
+    q.set('language', `eq.${String(params.language)}`);
+  }
+
+  const url = `${SUPABASE_URL}/rest/v1/articles?${q.toString()}`;
+  const response = await fetch(url, {
+    headers: withSupabaseHeaders({ Range: `${from}-${to}`, Prefer: 'count=exact' }),
+  });
+  if (!response.ok) {
+    throw new Error(`${response.status} ${url}`);
+  }
+
+  const rows = (await response.json()) as RawAdminArticle[];
+  const contentRange = response.headers.get('content-range') || '0-0/0';
+  const total = Number(contentRange.split('/')[1] || 0);
+
+  const res = {
+    articles: rows ?? [],
+    pagination: { page, limit, total },
+  };
+
   return {
     ...res,
     articles: (res.articles ?? []).map(normalizeAdminArticle),
@@ -92,6 +136,7 @@ interface RawAdminArticle {
   is_published?: boolean;
   author?: string | null;
   thumbnail_url?: string | null;
+  categories?: { slug?: string | null } | null;
 }
 
 export interface AdminArticle {
@@ -106,7 +151,7 @@ const normalizeAdminArticle = (article: RawAdminArticle): AdminArticle => ({
   title: article.title || 'Untitled article',
   source_name: article.source_name || 'Unknown source',
   language: article.language || 'unknown',
-  category_slug: article.category_slug || article.category || undefined,
+  category_slug: article.category_slug || article.categories?.slug || article.category || undefined,
   published_at: article.published_at || '',
   view_count: article.view_count ?? 0,
   like_count: article.like_count ?? 0,
