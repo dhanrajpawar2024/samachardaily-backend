@@ -8,15 +8,14 @@
  *   • Trending score recalculation
  *   • Kafka publishing for real-time feed delivery
  *
- * Cron Schedule (configurable via env):
- *   CRON_SCRAPE    default: every 30 minutes
- *   CRON_TRENDING  default: every 15 minutes
- *   CRON_CLEANUP   default: daily at 2am
+ * Operation Mode: MANUAL ONLY
+ *   • No automatic cron tasks
+ *   • Triggered via admin panel buttons
+ *   • Endpoints: /api/v1/scrape, /api/v1/trending/recalculate, /api/v1/cleanup
  */
 
 require('dotenv').config();
 const express  = require('express');
-const cron     = require('node-cron');
 const { connect: connectRedis } = require('./db/redis');
 const { pool }                  = require('./db/postgres');
 const { runScrapeJob }          = require('./jobs/scrapeJob');
@@ -168,43 +167,11 @@ const start = async () => {
 ╚══════════════════════════════════════════════════╝`);
     });
 
-    // ── Cron Jobs ────────────────────────────────────────────────
-
-    // 1. Scrape: every N minutes (default 30)
-    const scrapeSchedule = process.env.CRON_SCRAPE || '*/30 * * * *';
-    logger.info(`[Cron] Scrape schedule: ${scrapeSchedule}`);
-
-    // Run once immediately on startup
-    logger.info('[Startup] Running initial scrape...');
-    runScrapeJob().catch(err => logger.error('[Startup] Initial scrape error:', err));
-
-    cron.schedule(scrapeSchedule, () => {
-      logger.info('[Cron] Scheduled scrape triggered');
-      runScrapeJob().catch(err => logger.error('[Cron] Scrape error:', err));
-    }, { timezone: 'Asia/Kolkata' });
-
-    // 2. Trending: every 15 minutes
-    const trendingSchedule = process.env.CRON_TRENDING || '*/15 * * * *';
-    logger.info(`[Cron] Trending schedule: ${trendingSchedule}`);
-    cron.schedule(trendingSchedule, () => {
-      runTrendingJob().catch(err => logger.error('[Cron] Trending error:', err));
-    }, { timezone: 'Asia/Kolkata' });
-
-    // 3. Cleanup: daily at 2:00 AM IST
-    const cleanupSchedule = process.env.CRON_CLEANUP || '0 2 * * *';
-    logger.info(`[Cron] Cleanup schedule: ${cleanupSchedule}`);
-    cron.schedule(cleanupSchedule, () => {
-      runCleanupJob().catch(err => logger.error('[Cron] Cleanup error:', err));
-    }, { timezone: 'Asia/Kolkata' });
-
-    // 4. Video scrape: every 2 hours
-    const videoSchedule = process.env.CRON_VIDEO_SCRAPE || '0 */2 * * *';
-    logger.info(`[Cron] Video scrape schedule: ${videoSchedule}`);
-    // Run once on startup too
-    runVideoScrapeJob().catch(err => logger.error('[Startup] Initial video scrape error:', err));
-    cron.schedule(videoSchedule, () => {
-      runVideoScrapeJob().catch(err => logger.error('[Cron] Video scrape error:', err));
-    }, { timezone: 'Asia/Kolkata' });
+    // ── Manual Operation Only ────────────────────────────────────
+    // All jobs triggered via admin panel API endpoints
+    // No automatic cron tasks
+    logger.info('[Startup] Scraper service running in MANUAL mode');
+    logger.info('[Startup] Use admin panel to trigger: /api/v1/scrape, /api/v1/trending/recalculate, /api/v1/cleanup');
 
     // ── Graceful Shutdown ─────────────────────────────────────────
     const shutdown = async (signal) => {
