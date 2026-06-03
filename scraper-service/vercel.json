@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "buildCommand": "npm ci",
+  "public": false,
+  "env": {
+    "NODE_ENV": "production",
+    "PORT": "3007"
+  },
+  "envPrefix": "SCRAPER_"
+}
