@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: scraper-service
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: singapore
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: KAFKA_ENABLED
+        value: false
+      - key: DATABASE_URL
+        sync: false
+      - key: DB_BACKEND
+        value: supabase
+      - key: POSTGRES_SSL
+        value: true
+      - key: REDIS_URL
+        sync: false
+      - key: MAX_INGEST_PER_RUN
+        value: 500
+      - key: ENABLE_CONTENT_ENRICHMENT
+        value: true
+      - key: RSS_CONCURRENCY
+        value: 8
