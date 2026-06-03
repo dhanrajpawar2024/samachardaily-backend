@@ -12,6 +12,7 @@ CREATE TABLE articles (
     source_name    VARCHAR(255) NOT NULL,
     category_id    UUID         REFERENCES categories(id) ON DELETE SET NULL,
     language       CHAR(2)      NOT NULL,
+    country_code   CHAR(2),
     thumbnail_url  TEXT,
     published_at   TIMESTAMPTZ  NOT NULL,
     view_count     INT          NOT NULL DEFAULT 0,

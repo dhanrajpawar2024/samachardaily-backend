@@ -10,6 +10,7 @@ export interface Article {
   source_name: string;
   author?: string;
   language: string;
+  country_code?: string | null;
   category_id?: string;
   category_slug?: string;
   published_at: string;
@@ -64,21 +65,23 @@ const fetchJson = async <T>(url: string, options?: RequestInit): Promise<T> => {
 export const getFeed = (params: {
   language?: string;
   category?: string;
+  country?: string;
   page?: number;
   limit?: number;
 }) => {
   const q = new URLSearchParams({
     language: params.language || 'en',
     ...(params.category && { category: params.category }),
+    ...(params.country && { country: params.country }),
     page:  String(params.page  ?? 1),
     limit: String(params.limit ?? 20),
   });
   return fetchJson<FeedResponse>(`${API_BASE}/api/v1/feed?${q}`, { next: { revalidate: 120 } });
 };
 
-export const getTrending = (language = 'en', limit = 10) =>
+export const getTrending = (language = 'en', limit = 10, country?: string) =>
   fetchJson<Article[]>(
-    `${API_BASE}/api/v1/feed/trending?language=${language}&limit=${limit}`,
+    `${API_BASE}/api/v1/feed/trending?language=${language}&limit=${limit}${country ? `&country=${country}` : ''}`,
     { next: { revalidate: 300 } }
   );
 

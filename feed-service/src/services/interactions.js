@@ -77,15 +77,17 @@ const getUserInteractions = async (userId, limit = 100) => {
  * Get trending articles (what's popular across all users)
  * @param {string} language - single or comma-separated e.g. "en,hi,mr"
  */
-const getTrendingArticles = async (language = 'en', limit = 50) => {
+const getTrendingArticles = async (language = 'en', limit = 50, country = null) => {
   try {
     const langs = String(language).split(',').map(l => l.trim()).filter(Boolean);
     const langParams = langs.map((_, i) => `$${i + 1}`).join(', ');
+    const countryClause = country ? ` AND a.country_code = $${langs.length + 1}` : '';
+    const limitParamIndex = country ? langs.length + 2 : langs.length + 1;
     const trending = await query(
       `SELECT 
         a.id, a.title, a.summary, a.content, a.thumbnail_url, a.source_url, a.source_name,
         a.author, a.published_at, a.trending_score,
-        a.category_id, a.language,
+        a.category_id, a.language, a.country_code,
         COALESCE(a.view_count, 0) as view_count,
         COALESCE(a.like_count, 0) as like_count,
         COALESCE(a.share_count, 0) as share_count,
@@ -94,11 +96,11 @@ const getTrendingArticles = async (language = 'en', limit = 50) => {
         COUNT(DISTINCT uai.user_id) as interaction_count
        FROM articles a
        LEFT JOIN user_article_interactions uai ON a.id = uai.article_id
-       WHERE a.is_published = TRUE AND a.language IN (${langParams})
+       WHERE a.is_published = TRUE AND a.language IN (${langParams})${countryClause}
        GROUP BY a.id
        ORDER BY a.trending_score DESC, interaction_count DESC
-       LIMIT $${langs.length + 1}`,
-      [...langs, limit]
+       LIMIT $${limitParamIndex}`,
+      country ? [...langs, String(country).toLowerCase(), limit] : [...langs, limit]
     );
 
     return trending.rows;

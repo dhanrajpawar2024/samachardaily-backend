@@ -107,7 +107,7 @@ const extractSummary = (item) => {
  * @returns {Promise<Array>} - Normalized article objects
  */
 const scrapeRSSSource = async (source) => {
-  const { name, url, language, category } = source;
+  const { name, url, language, category, country } = source;
   try {
     const feed = await rssParser.parseURL(url);
     const articles = (feed.items || [])
@@ -124,6 +124,7 @@ const scrapeRSSSource = async (source) => {
           : new Date(),
         source_name:  name,
         language,
+        country_code: country || null,
         category_slug: category,
         provider:     'rss',
       }));

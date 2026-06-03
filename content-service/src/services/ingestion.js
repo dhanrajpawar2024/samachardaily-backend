@@ -42,6 +42,18 @@ const inferCategoryFromFeedUrl = (feedUrl = '') => {
   return 'top-stories';
 };
 
+const inferCountryFromFeedUrl = (feedUrl = '') => {
+  const normalized = feedUrl.toLowerCase();
+  if (normalized.includes('.co.uk') || normalized.includes('/uk/') || normalized.includes('british')) return 'gb';
+  if (normalized.includes('.com.au') || normalized.includes('/au/') || normalized.includes('australia')) return 'au';
+  if (normalized.includes('.ca') || normalized.includes('/ca/') || normalized.includes('canada')) return 'ca';
+  if (normalized.includes('.ie') || normalized.includes('irish') || normalized.includes('rte.ie')) return 'ie';
+  if (normalized.includes('.nz') || normalized.includes('new zealand')) return 'nz';
+  if (normalized.includes('.us') || normalized.includes('usa') || normalized.includes('american')) return 'us';
+  if (normalized.includes('.in') || normalized.includes('india') || normalized.includes('hindustan') || normalized.includes('bharat')) return 'in';
+  return null;
+};
+
 const normalizeSourceName = (feedTitle, feedUrl) => {
   const candidate = (feedTitle || '').trim();
   if (!candidate || ['home', 'rss', 'feed'].includes(candidate.toLowerCase())) {
@@ -59,19 +71,22 @@ const parseFeedConfig = (rawFeed) => {
   if (parts.length >= 3) {
     return {
       language: parts[0],
-      categorySlug: normalizeCategorySlug(parts[1]),
-      url: parts.slice(2).join('|'),
+      countryCode: parts.length >= 4 ? parts[1].toLowerCase() : inferCountryFromFeedUrl(parts.slice(2).join('|')),
+      categorySlug: normalizeCategorySlug(parts.length >= 4 ? parts[2] : parts[1]),
+      url: parts.length >= 4 ? parts.slice(3).join('|') : parts.slice(2).join('|'),
     };
   }
   if (parts.length === 2) {
     return {
       language: parts[0],
+      countryCode: inferCountryFromFeedUrl(parts[1]),
       categorySlug: inferCategoryFromFeedUrl(parts[1]),
       url: parts[1],
     };
   }
   return {
     language: inferLanguageFromFeedUrl(rawFeed),
+    countryCode: inferCountryFromFeedUrl(rawFeed),
     categorySlug: inferCategoryFromFeedUrl(rawFeed),
     url: rawFeed.trim(),
   };
@@ -102,6 +117,7 @@ const fetchFromNewsAPI = async (category = 'general', language = 'en') => {
       source_name: article.source.name,
       category_slug: normalizeCategorySlug(category),
       language,
+      country_code: article.source?.countryCode || inferCountryFromFeedUrl(article.source_url),
       provider: 'newsapi',
     }));
   } catch (error) {
@@ -117,7 +133,7 @@ const fetchFromRSSFeeds = async () => {
   const feedConfigs = (process.env.RSS_FEEDS || '').split(',').filter(Boolean).map(parseFeedConfig);
   const articles = [];
 
-  for (const { language, categorySlug, url } of feedConfigs) {
+  for (const { language, countryCode, categorySlug, url } of feedConfigs) {
     try {
       const feed = await rssParser.parseURL(url);
       const feedArticles = (feed.items || []).map(item => ({
@@ -131,6 +147,7 @@ const fetchFromRSSFeeds = async () => {
         source_name: normalizeSourceName(feed.title, url),
         category_slug: normalizeCategorySlug(categorySlug || inferCategoryFromFeedUrl(url)),
         language,
+        country_code: countryCode || inferCountryFromFeedUrl(url),
         provider: 'rss',
       }));
       articles.push(...feedArticles);
@@ -167,6 +184,7 @@ const storeArticle = async (articleData) => {
     author,
     published_at,
     source_name,
+    country_code,
     category_slug,
     language = 'en',
   } = articleData;
@@ -197,10 +215,10 @@ const storeArticle = async (articleData) => {
     const result = await query(
       `INSERT INTO articles (
         id, category_id, title, summary, content, thumbnail_url,
-        source_url, author, source_name, language,
+        source_url, author, source_name, language, country_code,
         published_at, is_published, is_breaking, trending_score,
         created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW())
       RETURNING id, title, published_at`,
       [
         articleId,
@@ -213,6 +231,7 @@ const storeArticle = async (articleData) => {
         author,
         source_name,
         language,
+        country_code || null,
         published_at,
         true, // is_published
         false, // is_breaking

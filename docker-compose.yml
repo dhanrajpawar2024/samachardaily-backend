@@ -240,12 +240,17 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: ${NODE_ENV:-development}
+      NODE_OPTIONS: --dns-result-order=ipv4first
       PORT: 3001
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       JWT_SECRET: ${JWT_SECRET:-change-this-secret-key-in-production}
       JWT_ACCESS_TOKEN_EXPIRY: 15m
       JWT_REFRESH_TOKEN_EXPIRY: 7d
+      DB_BACKEND: ${DB_BACKEND:-auto}
+      DATABASE_URL: ${DATABASE_URL:-}
+      POSTGRES_SSL: ${POSTGRES_SSL:-false}
+      PGSSLMODE: ${PGSSLMODE:-disable}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-samachar_daily}
@@ -282,12 +287,17 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: ${NODE_ENV:-development}
+      NODE_OPTIONS: --dns-result-order=ipv4first
       PORT: 3002
       NEWSAPI_KEY: ${NEWSAPI_KEY:-}
       NEWSAPI_BASE_URL: ${NEWSAPI_BASE_URL:-https://newsapi.org/v2}
       RSS_FEEDS: ${RSS_FEEDS:-}
       INGESTION_INTERVAL_MINUTES: ${INGESTION_INTERVAL_MINUTES:-30}
       MAX_ARTICLES_PER_FETCH: ${MAX_ARTICLES_PER_FETCH:-100}
+      DB_BACKEND: ${DB_BACKEND:-auto}
+      DATABASE_URL: ${DATABASE_URL:-}
+      POSTGRES_SSL: ${POSTGRES_SSL:-false}
+      PGSSLMODE: ${PGSSLMODE:-disable}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-samachar_daily}
@@ -325,7 +335,12 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: ${NODE_ENV:-development}
+      NODE_OPTIONS: --dns-result-order=ipv4first
       PORT: 3003
+      DB_BACKEND: ${DB_BACKEND:-auto}
+      DATABASE_URL: ${DATABASE_URL:-}
+      POSTGRES_SSL: ${POSTGRES_SSL:-false}
+      PGSSLMODE: ${PGSSLMODE:-disable}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-samachar_daily}
@@ -369,7 +384,12 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: ${NODE_ENV:-development}
+      NODE_OPTIONS: --dns-result-order=ipv4first
       PORT: 3004
+      DB_BACKEND: ${DB_BACKEND:-auto}
+      DATABASE_URL: ${DATABASE_URL:-}
+      POSTGRES_SSL: ${POSTGRES_SSL:-false}
+      PGSSLMODE: ${PGSSLMODE:-disable}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-samachar_daily}
@@ -420,7 +440,12 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: ${NODE_ENV:-development}
+      NODE_OPTIONS: --dns-result-order=ipv4first
       PORT: 3005
+      DB_BACKEND: ${DB_BACKEND:-auto}
+      DATABASE_URL: ${DATABASE_URL:-}
+      POSTGRES_SSL: ${POSTGRES_SSL:-false}
+      PGSSLMODE: ${PGSSLMODE:-disable}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-samachar_daily}
@@ -470,7 +495,12 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: ${NODE_ENV:-development}
+      NODE_OPTIONS: --dns-result-order=ipv4first
       PORT: 3006
+      DB_BACKEND: ${DB_BACKEND:-auto}
+      DATABASE_URL: ${DATABASE_URL:-}
+      POSTGRES_SSL: ${POSTGRES_SSL:-false}
+      PGSSLMODE: ${PGSSLMODE:-disable}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-samachar_daily}
@@ -562,8 +592,13 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: ${NODE_ENV:-development}
+      NODE_OPTIONS: --dns-result-order=ipv4first
       PORT: 3006
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      DB_BACKEND: ${DB_BACKEND:-auto}
+      DATABASE_URL: ${DATABASE_URL:-}
+      POSTGRES_SSL: ${POSTGRES_SSL:-false}
+      PGSSLMODE: ${PGSSLMODE:-disable}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-samachar_daily}

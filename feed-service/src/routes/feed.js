@@ -6,7 +6,7 @@ const { recordInteraction, getTrendingArticles, VALID_ACTIONS } = require('../se
 
 const router = express.Router();
 
-const getLatestArticles = async (language = 'en', limit = 50, offset = 0, category = null) => {
+const getLatestArticles = async (language = 'en', limit = 50, offset = 0, category = null, country = null) => {
   const langs = String(language).split(',').map(l => l.trim()).filter(Boolean);
   const langParams = langs.map((_, i) => `$${i + 1}`).join(', ');
 
@@ -21,11 +21,18 @@ const getLatestArticles = async (language = 'en', limit = 50, offset = 0, catego
     params.push(category);
   }
 
+  if (country) {
+    const paramIndex = params.length + 1;
+    whereClause += ` AND a.country_code = $${paramIndex}`;
+    countWhereClause += ` AND a.country_code = $${paramIndex}`;
+    params.push(String(country).toLowerCase());
+  }
+
   const articlesResult = await query(
     `SELECT
       a.id, a.title, a.summary, a.content, a.thumbnail_url, a.source_url, a.source_name,
       a.author, a.published_at, a.trending_score,
-      a.category_id, a.language,
+      a.category_id, a.language, a.country_code,
       COALESCE(a.view_count, 0) as view_count,
       COALESCE(a.like_count, 0) as like_count,
       COALESCE(a.share_count, 0) as share_count,
@@ -61,7 +68,7 @@ const getLatestArticles = async (language = 'en', limit = 50, offset = 0, catego
  */
 router.get('/', async (req, res) => {
   try {
-    const { page = 1, limit = 50, language = 'en', languages, category } = req.query;
+    const { page = 1, limit = 50, language = 'en', languages, category, country } = req.query;
     const pageNum = parseInt(page);
     const limitNum = Math.min(parseInt(limit), 100);
     const userId = req.user?.userId || null;
@@ -70,10 +77,10 @@ router.get('/', async (req, res) => {
 
     let feed;
     if (userId) {
-      feed = await buildPersonalizedFeed(userId, langParam, pageNum, limitNum);
+      feed = await buildPersonalizedFeed(userId, langParam, pageNum, limitNum, country);
     } else {
       const offset = (pageNum - 1) * limitNum;
-      const latest = await getLatestArticles(langParam, limitNum, offset, category);
+      const latest = await getLatestArticles(langParam, limitNum, offset, category, country);
       feed = {
         articles: latest.articles,
         pagination: { page: pageNum, limit: limitNum, total: latest.total },
@@ -133,9 +140,9 @@ router.post('/interactions', [
  */
 router.get('/trending', async (req, res) => {
   try {
-    const { language = 'en', limit = 50 } = req.query;
+    const { language = 'en', limit = 50, country } = req.query;
 
-    const trending = await getTrendingArticles(language, Math.min(parseInt(limit), 100));
+    const trending = await getTrendingArticles(language, Math.min(parseInt(limit), 100), country);
 
     res.status(200).json({
       success: true,

@@ -30,16 +30,16 @@ const pa = require('./pa');
 const ml = require('./ml');
 
 const ALL_SOURCES = [
-  ...en,
-  ...hi,
-  ...te,
-  ...ta,
-  ...kn,
-  ...mr,
-  ...bn,
-  ...gu,
-  ...pa,
-  ...ml,
+  ...en.map(source => ({ ...source, country: source.country || 'in' })),
+  ...hi.map(source => ({ ...source, country: source.country || 'in' })),
+  ...te.map(source => ({ ...source, country: source.country || 'in' })),
+  ...ta.map(source => ({ ...source, country: source.country || 'in' })),
+  ...kn.map(source => ({ ...source, country: source.country || 'in' })),
+  ...mr.map(source => ({ ...source, country: source.country || 'in' })),
+  ...bn.map(source => ({ ...source, country: source.country || 'in' })),
+  ...gu.map(source => ({ ...source, country: source.country || 'in' })),
+  ...pa.map(source => ({ ...source, country: source.country || 'in' })),
+  ...ml.map(source => ({ ...source, country: source.country || 'in' })),
 ];
 
 /**

@@ -59,7 +59,7 @@ const getCategoryId = async (slug, language) => {
 const storeArticle = async (article) => {
   const {
     title, summary, content, source_url, thumbnail_url,
-    author, published_at, source_name, language, category_slug,
+    author, published_at, source_name, language, country_code, category_slug,
   } = article;
 
   if (!title || !source_url) return null;
@@ -76,11 +76,11 @@ const storeArticle = async (article) => {
       `INSERT INTO articles (
          id, category_id, title, summary, content, thumbnail_url,
          source_url, author, source_name, language,
-         published_at, is_published, is_breaking, trending_score,
+         country_code, published_at, is_published, is_breaking, trending_score,
          view_count, like_count, share_count, is_premium,
          created_at, updated_at
        ) VALUES (
-         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,true,false,0,0,0,0,false,NOW(),NOW()
+         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,false,0,0,0,0,false,NOW(),NOW()
        )
        ON CONFLICT (source_url) DO UPDATE SET
          thumbnail_url = COALESCE(articles.thumbnail_url, EXCLUDED.thumbnail_url),
@@ -98,7 +98,7 @@ const storeArticle = async (article) => {
        RETURNING id, title`,
       [id, categoryId, title, summary || '', content || '',
        thumbnail_url || null, source_url, author || null,
-       source_name, language || 'en', published_at]
+       source_name, language || 'en', country_code || null, published_at]
     );
     return result.rows[0] || null;
   } catch (err) {

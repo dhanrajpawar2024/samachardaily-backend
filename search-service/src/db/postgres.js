@@ -1,9 +1,21 @@
 const { Pool } = require('pg');
 
-const poolConfig = process.env.DATABASE_URL
+const shouldUseSSL =
+  process.env.POSTGRES_SSL === 'true' ||
+  process.env.PGSSLMODE === 'require' ||
+  process.env.NODE_ENV === 'production';
+
+const dbBackend = (process.env.DB_BACKEND || 'auto').toLowerCase();
+const shouldUseDatabaseUrl = Boolean(process.env.DATABASE_URL) && dbBackend !== 'postgres';
+
+if (dbBackend === 'supabase' && !process.env.DATABASE_URL) {
+  throw new Error('DB_BACKEND is set to "supabase" but DATABASE_URL is missing.');
+}
+
+const poolConfig = shouldUseDatabaseUrl
   ? {
       connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      ssl: shouldUseSSL ? { rejectUnauthorized: false } : false,
     }
   : {
       host: process.env.POSTGRES_HOST || 'localhost',

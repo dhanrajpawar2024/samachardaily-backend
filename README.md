@@ -91,6 +91,26 @@ cp .env.example .env
 docker compose up -d
 ```
 
+### Supabase migration (Postgres first)
+If you want to move only PostgreSQL to Supabase and keep the rest local:
+
+1. In `.env`, set backend mode to Supabase and add your Supabase pooled connection string:
+```bash
+DB_BACKEND=supabase
+DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres
+POSTGRES_SSL=true
+PGSSLMODE=require
+```
+2. Keep `docker compose up -d` as-is; services will use Supabase when `DB_BACKEND=supabase`.
+3. To temporarily switch back to local Postgres, set:
+```bash
+DB_BACKEND=postgres
+```
+4. Optional (recommended): stop local Postgres container if you don't need it:
+```bash
+docker compose stop postgres
+```
+
 ### 3 — Wait for healthy state (~60 seconds for Elasticsearch)
 ```bash
 docker compose ps

@@ -87,13 +87,13 @@ const calculateArticleScore = (article, userAffinity) => {
  * @param {string} userId
  * @param {string|string[]} language - single language code or comma-separated list e.g. "en,hi,mr"
  */
-const buildPersonalizedFeed = async (userId, language = 'en', page = 1, limit = 50) => {
+const buildPersonalizedFeed = async (userId, language = 'en', page = 1, limit = 50, country = null) => {
   // Support comma-separated multi-language e.g. "en,hi,mr"
   const langs = Array.isArray(language)
     ? language
     : String(language).split(',').map(l => l.trim()).filter(Boolean);
 
-  const cacheKey = `feed:${userId}:${langs.join('_')}:${page}:${limit}`;
+  const cacheKey = `feed:${userId}:${langs.join('_')}:${country || 'all'}:${page}:${limit}`;
 
   const cached = await redisGet(cacheKey);
   if (cached) {
@@ -106,11 +106,12 @@ const buildPersonalizedFeed = async (userId, language = 'en', page = 1, limit = 
 
     // Build parameterized language filter
     const langParams = langs.map((_, i) => `$${i + 1}`).join(', ');
+    const countryClause = country ? ` AND a.country_code = $${langs.length + 1}` : '';
     const articles = await getAll(
       `SELECT 
         a.id, a.title, a.summary, a.content, a.thumbnail_url, a.source_url, a.source_name,
         a.author, a.published_at, a.trending_score,
-        a.category_id, a.language,
+        a.category_id, a.language, a.country_code,
         COALESCE(a.view_count, 0) as view_count,
         COALESCE(a.like_count, 0) as like_count,
         COALESCE(a.share_count, 0) as share_count,
@@ -121,11 +122,11 @@ const buildPersonalizedFeed = async (userId, language = 'en', page = 1, limit = 
        FROM articles a
        LEFT JOIN bookmarks bm ON a.id = bm.article_id
        LEFT JOIN user_article_interactions sh ON a.id = sh.article_id AND sh.action = 'share'
-       WHERE a.is_published = TRUE AND a.language IN (${langParams})
+       WHERE a.is_published = TRUE AND a.language IN (${langParams})${countryClause}
        GROUP BY a.id
        ORDER BY a.published_at DESC
        LIMIT 500`,
-      langs
+      country ? [...langs, String(country).toLowerCase()] : langs
     );
 
     // Score and rank articles

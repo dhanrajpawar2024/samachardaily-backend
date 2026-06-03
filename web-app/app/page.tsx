@@ -1,3 +1,4 @@
+import { headers } from 'next/headers';
 import { getTrending, getFeed, getActiveAds } from '@/lib/api';
 import { CategoryTabs } from '@/components/CategoryTabs';
 import { LanguageSelector } from '@/components/LanguageSelector';
@@ -12,10 +13,18 @@ export default async function HomePage({ searchParams }: HomeProps) {
   const lang     = rawLang     || 'en';
   const category = rawCategory || 'top-stories';
   const page     = Number(rawPage || 1);
+  const requestHeaders = headers();
+  const country = (
+    requestHeaders.get('x-vercel-ip-country') ||
+    requestHeaders.get('cf-ipcountry') ||
+    requestHeaders.get('x-country-code') ||
+    requestHeaders.get('x-country') ||
+    ''
+  ).toLowerCase() || undefined;
 
   const [trendingResult, feedResult, adsResult] = await Promise.allSettled([
-    getTrending(lang, 8),
-    getFeed({ language: lang, category, page, limit: 20 }),
+    getTrending(lang, 8, country),
+    getFeed({ language: lang, category, country, page, limit: 20 }),
     getActiveAds({ language: lang }),
   ]);
 
