@@ -13,7 +13,7 @@ export default async function HomePage({ searchParams }: HomeProps) {
   const lang     = rawLang     || 'en';
   const category = rawCategory || 'top-stories';
   const page     = Number(rawPage || 1);
-  const requestHeaders = headers();
+  const requestHeaders = await headers();
   const country = (
     requestHeaders.get('x-vercel-ip-country') ||
     requestHeaders.get('cf-ipcountry') ||
