@@ -1,5 +1,5 @@
 export const API_BASE    = import.meta.env.VITE_API_URL     || 'http://localhost:3000';
-export const SCRAPER_BASE = import.meta.env.VITE_SCRAPER_URL || 'https://scraper-service-production-5c45.up.railway.app';
+export const SCRAPER_BASE = import.meta.env.VITE_SCRAPER_URL || 'http://localhost:3007';
 export const WEB_BASE = import.meta.env.VITE_WEB_URL || 'https://samachardaily.in';
 
 const SUPABASE_URL =
