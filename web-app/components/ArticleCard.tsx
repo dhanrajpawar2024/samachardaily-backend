@@ -53,7 +53,7 @@ export function ArticleCard({ article, compact = false, onOpenArticle }: Props) 
             {article.title}
           </p>
           {cleanSummary && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">{cleanSummary}</p>}
-          <p className="text-xs text-slate-400 mt-1">{timeAgo}</p>
+          <p className="text-xs text-slate-400 mt-1" suppressHydrationWarning>{timeAgo}</p>
         </div>
       </a>
     );
@@ -107,7 +107,7 @@ export function ArticleCard({ article, compact = false, onOpenArticle }: Props) 
         )}
         <div className="mt-auto flex items-center justify-between text-xs text-slate-400 pt-2
                         border-t border-slate-100 dark:border-slate-700">
-          <span className="flex items-center gap-1"><Clock size={11} /> {timeAgo}</span>
+          <span className="flex items-center gap-1" suppressHydrationWarning><Clock size={11} /> {timeAgo}</span>
         </div>
       </div>
     </a>

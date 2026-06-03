@@ -165,7 +165,7 @@ export function HomeFeedClient({ trending, feed, lang, category, ads = [] }: Pro
                 {/* Meta row */}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
                   {article.author && <span className="font-medium text-slate-700 dark:text-slate-300">By {article.author}</span>}
-                  <span className="flex items-center gap-1"><Clock size={11} /> {timeAgo}</span>
+                  <span className="flex items-center gap-1" suppressHydrationWarning><Clock size={11} /> {timeAgo}</span>
                   <span className="flex items-center gap-1"><Eye size={11} /> {(article.view_count ?? 0).toLocaleString()} views</span>
                   {isLoading && <span className="text-brand-600 dark:text-brand-400 animate-pulse">Loading…</span>}
                 </div>
