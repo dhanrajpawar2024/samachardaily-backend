@@ -3,6 +3,9 @@ const logger = require('../utils/logger');
 
 let client = null;
 let redisDisabled = false;
+let redisDisableLogged = false;
+
+const isRedisEnabled = () => String(process.env.REDIS_ENABLED || 'false').toLowerCase() === 'true';
 
 const getErrorMessage = (err) => {
   if (!err) return 'Unknown Redis error';
@@ -12,6 +15,14 @@ const getErrorMessage = (err) => {
 
 const connect = async () => {
   if (redisDisabled) return null;
+  if (!isRedisEnabled()) {
+    redisDisabled = true;
+    if (!redisDisableLogged) {
+      redisDisableLogged = true;
+      logger.info('[Redis] Disabled (set REDIS_ENABLED=true to enable cache)');
+    }
+    return null;
+  }
   if (!process.env.REDIS_URL) {
     redisDisabled = true;
     logger.warn('[Redis] REDIS_URL not set, Redis cache disabled');
@@ -65,5 +76,5 @@ const del = async (key) => {
   }
 };
 
-module.exports = { connect, get, set, del };
+module.exports = { connect, get, set, del, isRedisEnabled };
 

@@ -16,18 +16,23 @@
 
 require('dotenv').config();
 const express  = require('express');
-const { connect: connectRedis } = require('./db/redis');
 const { pool }                  = require('./db/postgres');
 const { runScrapeJob }          = require('./jobs/scrapeJob');
 const { runTrendingJob }        = require('./jobs/trendingJob');
 const { runCleanupJob }         = require('./jobs/cleanupJob');
 const { runVideoScrapeJob }     = require('./jobs/videoScrapeJob');
 const { ALL_SOURCES, getSupportedLanguages } = require('./sources');
-const { get: redisGet }         = require('./db/redis');
+const { get: redisGet, isRedisEnabled } = require('./db/redis');
 const logger                    = require('./utils/logger');
 
 const app  = express();
 const PORT = parseInt(process.env.PORT || '3006');
+
+const withTimeout = (promise, ms, fallback = null) =>
+  Promise.race([
+    promise,
+    new Promise((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ]);
 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', process.env.CORS_ORIGIN || '*');
@@ -45,20 +50,26 @@ app.use(express.json());
 
 // ── Health Check ─────────────────────────────────────────────────
 app.get('/health', async (req, res) => {
+  let dbConnected = false;
   try {
-    await pool.query('SELECT 1');
-    const lastRun = await redisGet('scraper:last_run');
-    res.json({
-      status: 'healthy',
-      service: 'scraper-service',
-      timestamp: new Date().toISOString(),
-      sources: ALL_SOURCES.length,
-      languages: getSupportedLanguages(),
-      last_run: lastRun,
-    });
+    const pgResult = await withTimeout(pool.query('SELECT 1'), 1200, null);
+    dbConnected = Boolean(pgResult);
   } catch (err) {
-    res.status(503).json({ status: 'unhealthy', error: err.message });
+    logger.warn(`[Health] PostgreSQL check failed: ${err.message}`);
   }
+
+  const lastRun = await withTimeout(redisGet('scraper:last_run'), 500, null);
+  res.json({
+    status: dbConnected ? 'healthy' : 'degraded',
+    service: 'scraper-service',
+    timestamp: new Date().toISOString(),
+    sources: ALL_SOURCES.length,
+    languages: getSupportedLanguages(),
+    last_run: lastRun,
+    dependencies: {
+      postgres: dbConnected,
+    },
+  });
 });
 
 // ── Manual Trigger Endpoints (for admin/testing) ─────────────────
@@ -141,7 +152,7 @@ app.post('/api/v1/sources', (req, res) => {
 
 // Get last scrape stats
 app.get('/api/v1/stats', async (req, res) => {
-  const lastRun = await redisGet('scraper:last_run');
+  const lastRun = await withTimeout(redisGet('scraper:last_run'), 500, null);
   res.json({ last_run: lastRun, total_sources: ALL_SOURCES.length });
 });
 
@@ -151,8 +162,11 @@ app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 // ── Startup ───────────────────────────────────────────────────────
 const start = async () => {
   try {
-    logger.info('[Startup] Connecting to Redis...');
-    await connectRedis();
+    if (isRedisEnabled()) {
+      logger.info('[Startup] Redis cache enabled');
+    } else {
+      logger.info('[Startup] Redis cache disabled (optional)');
+    }
 
     logger.info('[Startup] Testing PostgreSQL connection...');
     await pool.query('SELECT 1');
